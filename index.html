@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TABATA</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --work-color: #FF3D00;
+    --rest-color: #00E5FF;
+    --bg: #0A0A0F;
+    --surface: #12121A;
+    --surface2: #1C1C28;
+    --text: #F0F0F8;
+    --text-dim: #6B6B8A;
+    --accent: #FF3D00;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  /* TABS */
+  .app-wrapper {
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+
+  .tab-nav {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 16px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .tab-btn.active { color: var(--text); }
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 16px; right: 16px;
+    height: 2px;
+    background: var(--work-color);
+  }
+
+  .tab-panel { display: none; flex: 1; flex-direction: column; }
+  .tab-panel.active { display: flex; }
+
+  /* ===== TIMER TAB ===== */
+  .timer-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 0;
+    position: relative;
+  }
+
+  /* Phase indicator */
+  .phase-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.3em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    transition: color 0.4s;
+    min-height: 28px;
+  }
+  .phase-label.work { color: var(--work-color); }
+  .phase-label.rest { color: var(--rest-color); }
+  .phase-label.ready { color: #FFD600; }
+
+  /* BIG TIMER */
+  .timer-ring-wrap {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 8px 0;
+  }
+
+  .timer-ring-svg {
+    width: 280px;
+    height: 280px;
+    transform: rotate(-90deg);
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: rgba(255,255,255,0.05);
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 754;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.1s linear, stroke 0.4s;
+  }
+
+  .ring-progress.work { stroke: var(--work-color); filter: drop-shadow(0 0 8px var(--work-color)); }
+  .ring-progress.rest { stroke: var(--rest-color); filter: drop-shadow(0 0 8px var(--rest-color)); }
+  .ring-progress.ready { stroke: #FFD600; filter: drop-shadow(0 0 8px #FFD600); }
+
+  .timer-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .time-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 88px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    transition: color 0.4s;
+  }
+  .time-num.work { color: var(--work-color); }
+  .time-num.rest { color: var(--rest-color); }
+  .time-num.ready { color: #FFD600; }
+
+  .round-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* Voice cue marquee */
+  .voice-cue-bar {
+    width: 100%;
+    max-width: 320px;
+    margin: 16px 0 4px;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border-left: 3px solid var(--text-dim);
+    transition: border-color 0.4s;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .voice-cue-bar.work { border-color: var(--work-color); }
+  .voice-cue-bar.rest { border-color: var(--rest-color); }
+
+  .voice-cue-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 300;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.4s;
+  }
+  .voice-cue-text.active { color: var(--text); font-weight: 500; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    align-items: center;
+  }
+
+  .btn-main {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: none;
+    background: var(--work-color);
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, opacity 0.15s;
+    box-shadow: 0 0 20px rgba(255,61,0,0.4);
+  }
+  .btn-main:active { transform: scale(0.94); }
+  .btn-main:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-sec {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-sec:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+  .btn-sec:active { transform: scale(0.93); }
+
+  /* Round progress dots */
+  .round-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 320px;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: background 0.3s;
+  }
+  .dot.done { background: var(--work-color); border-color: var(--work-color); }
+  .dot.current { background: #FFD600; border-color: #FFD600; box-shadow: 0 0 6px #FFD600; }
+
+  /* Status text */
+  .status-line {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  /* ===== SETTINGS TAB ===== */
+  .settings-section {
+    flex: 1;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .setting-label {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text);
+    flex-shrink: 0;
+    min-width: 80px;
+  }
+  .setting-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .num-control {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface2);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  .num-btn {
+    width: 44px; height: 44px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .num-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+  .num-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    min-width: 44px;
+    text-align: center;
+  }
+
+  /* Voice settings */
+  .voice-block {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .voice-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .voice-type-label {
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot-work { width: 8px; height: 8px; border-radius: 50%; background: var(--work-color); flex-shrink: 0; }
+  .dot-rest { width: 8px; height: 8px; border-radius: 50%; background: var(--rest-color); flex-shrink: 0; }
+
+  .voice-textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 60px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+  }
+  .voice-textarea:focus { border-color: rgba(255,255,255,0.2); }
+  .voice-textarea::placeholder { color: var(--text-dim); }
+
+  .voice-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .test-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .test-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  /* Toggle switch */
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+  .toggle {
+    position: relative;
+    width: 40px; height: 22px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.12);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 3px; top: 3px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--work-color); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  /* Voice & speed controls */
+  .voice-select {
+    background: var(--surface2);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    width: 100%;
+  }
+  .voice-select option { background: #1C1C28; }
+
+  .range-wrap { display: flex; align-items: center; gap: 10px; }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.1);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--work-color);
+    cursor: pointer;
+  }
+  .range-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* Save button */
+  .save-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    background: var(--work-color);
+    color: #fff;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.15s;
+    margin-top: 4px;
+  }
+  .save-btn:active { transform: scale(0.98); opacity: 0.9; }
+
+  /* Countdown overlay */
+  .countdown-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,15,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .countdown-overlay.show { display: flex; }
+  .countdown-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 160px;
+    color: #FFD600;
+    line-height: 1;
+    animation: pulse 1s ease-in-out infinite;
+    filter: drop-shadow(0 0 30px #FFD600);
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+  .countdown-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.3em;
+    color: var(--text-dim);
+  }
+
+  /* Flash effect */
+  .flash-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+  .flash-overlay.flash-work { background: rgba(255,61,0,0.15); }
+  .flash-overlay.flash-rest { background: rgba(0,229,255,0.12); }
+
+  /* Completion screen */
+  .complete-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+    padding: 40px;
+  }
+  .complete-overlay.show { display: flex; }
+  .complete-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px;
+    letter-spacing: 0.1em;
+    background: linear-gradient(135deg, var(--work-color), #FFD600);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .complete-stats {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 2;
+  }
+  .complete-btn {
+    margin-top: 20px;
+    padding: 12px 40px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: none;
+    color: var(--text);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .complete-btn:hover { background: rgba(255,255,255,0.06); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  @keyframes slidein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- TAB NAV -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="showTab('timer')">⏱ 타이머</button>
+    <button class="tab-btn" onclick="showTab('settings')">⚙ 설정</button>
+  </nav>
+
+  <!-- ===== TIMER PANEL ===== -->
+  <div class="tab-panel active" id="tab-timer">
+    <div class="timer-section">
+      <div class="phase-label" id="phaseLabel">준비 완료</div>
+
+      <div class="timer-ring-wrap">
+        <svg class="timer-ring-svg" viewBox="0 0 280 280">
+          <circle class="ring-bg" cx="140" cy="140" r="120"/>
+          <circle class="ring-progress ready" id="ringProgress" cx="140" cy="140" r="120"/>
+        </svg>
+        <div class="timer-display">
+          <div class="time-num" id="timeNum">20</div>
+          <div class="round-info" id="roundInfo">라운드 — / —</div>
+        </div>
+      </div>
+
+      <div class="voice-cue-bar" id="voiceCueBar">
+        <span class="voice-cue-text" id="voiceCueText">음성 안내가 여기 표시됩니다</span>
+      </div>
+
+      <div class="controls">
+        <button class="btn-sec" id="resetBtn" onclick="resetTimer()" title="리셋">↺</button>
+        <button class="btn-main" id="startBtn" onclick="toggleTimer()">▶</button>
+        <button class="btn-sec" id="skipBtn" onclick="skipPhase()" title="다음 단계">⏭</button>
+      </div>
+
+      <div class="round-dots" id="roundDots"></div>
+      <div class="status-line" id="statusLine">시작 버튼을 눌러 타바타를 시작하세요</div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS PANEL ===== -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="settings-section">
+
+      <!-- Timer Settings -->
+      <div>
+        <div class="section-title">타이머 설정</div>
+        <div class="setting-group" style="margin-top:14px;">
+          <div class="setting-row">
+            <div style="flex:1;min-width:0;"><div class="setting-label">운동 시간</div><div class="setting-sub">초</div></div>
+            <div class="num-control">
+              <button class="num-btn" onclick="adj('work',-5)">−</button>
+              <span class="num-val" id="workVal">20</span>
+              <button class="num-btn" onclick="adj('work',5)">＋</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div style="flex:1;min-width:0;"><div class="setting-label">휴식 시간</div><div class="setting-sub">초</div></div>
+            <div class="num-control">
+              <button class="num-btn" onclick="adj('rest',-5)">−</button>
+              <span class="num-val" id="restVal">10</span>
+              <button class="num-btn" onclick="adj('rest',5)">＋</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div style="flex:1;min-width:0;"><div class="setting-label">라운드 수</div><div class="setting-sub">세트</div></div>
+            <div class="num-control">
+              <button class="num-btn" onclick="adj('rounds',-1)">−</button>
+              <span class="num-val" id="roundsVal">8</span>
+              <button class="num-btn" onclick="adj('rounds',1)">＋</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div style="flex:1;min-width:0;"><div class="setting-label">목표 횟수</div><div class="setting-sub">운동 구간당 몇 회</div></div>
+            <div class="num-control">
+              <button class="num-btn" onclick="adjRep('total',-1)">−</button>
+              <span class="num-val" id="repTotalVal">10</span>
+              <button class="num-btn" onclick="adjRep('total',1)">＋</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div style="flex:1;min-width:0;"><div class="setting-label">준비 시간</div><div class="setting-sub">시작 전 카운트다운</div></div>
+            <div class="num-control">
+              <button class="num-btn" onclick="adj('prep',-1)">−</button>
+              <span class="num-val" id="prepVal">5</span>
+              <button class="num-btn" onclick="adj('prep',1)">＋</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Voice Settings -->
+      <div>
+        <div class="section-title">음성 안내 설정</div>
+        <div class="setting-group" style="margin-top:14px;">
+
+          <!-- Enable toggle -->
+          <div class="setting-row">
+            <div class="setting-label" style="flex:1;">음성 안내 켜기</div>
+            <label class="toggle">
+              <input type="checkbox" id="voiceEnabled" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- TTS status -->
+          <div id="ttsStatus" style="font-size:12px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#6B6B8A;line-height:1.6;">
+            TTS 상태 확인 중...
+          </div>
+
+          <!-- Voice selection -->
+          <div>
+            <div class="setting-label" style="margin-bottom:6px;font-size:13px;">음성 선택</div>
+            <select class="voice-select" id="voiceSelect">
+              <option value="">기본 음성</option>
+            </select>
+          </div>
+
+          <!-- Rate -->
+          <div class="setting-row">
+            <div style="flex-shrink:0;min-width:70px;"><div class="setting-label">말하기 속도</div></div>
+            <div class="range-wrap" style="flex:1;">
+              <input type="range" id="rateRange" min="0.5" max="2" step="0.1" value="1" oninput="updateRange('rate')">
+              <span class="range-val" id="rateVal">1.0</span>
+            </div>
+          </div>
+
+          <!-- Pitch -->
+          <div class="setting-row">
+            <div style="flex-shrink:0;min-width:70px;"><div class="setting-label">음성 높이</div></div>
+            <div class="range-wrap" style="flex:1;">
+              <input type="range" id="pitchRange" min="0.5" max="2" step="0.1" value="1" oninput="updateRange('pitch')">
+              <span class="range-val" id="pitchVal">1.0</span>
+            </div>
+          </div>
+
+          <!-- Volume -->
+          <div class="setting-row">
+            <div style="flex-shrink:0;min-width:70px;"><div class="setting-label">볼륨</div></div>
+            <div class="range-wrap" style="flex:1;">
+              <input type="range" id="volRange" min="0" max="1" step="0.1" value="1" oninput="updateRange('vol')">
+              <span class="range-val" id="volVal">1.0</span>
+            </div>
+          </div>
+
+          <!-- WORK voice cue -->
+          <div class="voice-block">
+            <div class="voice-row-header">
+              <div class="voice-type-label"><span class="dot-work"></span> 운동 시작 안내</div>
+              <button class="test-btn" onclick="testSpeak('work')">🔊 테스트</button>
+            </div>
+            <textarea class="voice-textarea" id="workCue" placeholder="예: 시작! 전력을 다하세요!" rows="2">{round}라운드! 시작!</textarea>
+            <div class="voice-hint">
+              💡 변수 사용 가능: <code style="color:#FF3D00">{round}</code> = 현재 라운드, <code style="color:#FF3D00">{total}</code> = 전체 라운드
+            </div>
+          </div>
+
+          <!-- REST voice cue -->
+          <div class="voice-block">
+            <div class="voice-row-header">
+              <div class="voice-type-label"><span class="dot-rest"></span> 휴식 시작 안내</div>
+              <button class="test-btn" onclick="testSpeak('rest')">🔊 테스트</button>
+            </div>
+            <textarea class="voice-textarea" id="restCue" placeholder="예: 휴식! 잠깐 쉬어가세요." rows="2">휴식. 숨 고르세요.</textarea>
+            <div class="voice-hint">💡 변수 사용 가능: <code style="color:#00E5FF">{round}</code>, <code style="color:#00E5FF">{total}</code></div>
+          </div>
+
+          <!-- 3 sec countdown cue -->
+          <div class="voice-block">
+            <div class="voice-row-header">
+              <div class="voice-type-label">⚡ 3초 전 경고</div>
+              <label class="toggle" style="transform:scale(0.85);">
+                <input type="checkbox" id="countdownCueEnabled" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <textarea class="voice-textarea" id="countdownCue" placeholder="예: 곧 시작합니다" rows="1">곧 시작합니다</textarea>
+          </div>
+
+          <!-- Count announce -->
+          <div class="voice-block">
+            <div class="voice-row-header">
+              <div class="voice-type-label">🔢 남은 시간 카운트</div>
+              <label class="toggle" style="transform:scale(0.85);">
+                <input type="checkbox" id="countAnnounce" onchange="toggleCountOptions()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div id="countOptions" style="display:none;flex-direction:column;gap:10px;margin-top:4px;">
+              <div class="setting-row">
+                <div><div class="setting-label" style="font-size:13px;">읽기 간격</div><div class="setting-sub">초마다 읽기 (1=매초)</div></div>
+                <div class="num-control">
+                  <button class="num-btn" onclick="adjCount(-1)">−</button>
+                  <span class="num-val" id="countIntervalVal">1</span>
+                  <button class="num-btn" onclick="adjCount(1)">＋</button>
+                </div>
+              </div>
+              <div>
+                <div class="setting-label" style="font-size:13px;margin-bottom:6px;">적용 구간</div>
+                <div style="display:flex;gap:8px;">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                    <input type="radio" name="countPhase" value="work" style="accent-color:#FF3D00;"> 운동
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                    <input type="radio" name="countPhase" value="rest" style="accent-color:#00E5FF;"> 휴식
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                    <input type="radio" name="countPhase" value="both" checked style="accent-color:#FFD600;"> 모두
+                  </label>
+                </div>
+              </div>
+              <div class="voice-hint">💡 예: 간격 5 → 남은 시간이 20, 15, 10, 5초일 때 읽어줍니다</div>
+            </div>
+          </div>
+
+          <!-- Rep count announce -->
+          <div class="voice-block">
+            <div class="voice-row-header">
+              <div class="voice-type-label">💪 운동 횟수 카운트</div>
+              <label class="toggle" style="transform:scale(0.85);">
+                <input type="checkbox" id="repEnabled" checked onchange="toggleRepOptions()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div id="repOptions" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+              <div class="voice-hint" style="background:rgba(255,61,0,0.06);border-radius:6px;padding:8px 10px;">
+                운동 시간을 목표 횟수로 균등 분할해서 자동으로 읽어줍니다.<br>
+                예: 운동 20초, 목표 10회 → 2초마다 "1, 2, 3…10"
+              </div>
+              <div>
+                <div class="setting-label" style="font-size:13px;margin-bottom:6px;">카운트 방향</div>
+                <div style="display:flex;gap:16px;">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                    <input type="radio" name="repMode" value="up" checked style="accent-color:#FF3D00;"> 오름차순 (1, 2, 3…)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                    <input type="radio" name="repMode" value="down" style="accent-color:#FF3D00;"> 내림차순 (10, 9, 8…)
+                  </label>
+                </div>
+              </div>
+              <div>
+                <div class="setting-label" style="font-size:13px;margin-bottom:6px;">안내 문장</div>
+                <textarea class="voice-textarea" id="repCue" rows="1" placeholder="예: {count}회">{count}</textarea>
+                <div class="voice-hint" style="margin-top:6px;">💡 <code style="color:#FF3D00">{count}</code> = 현재 횟수, <code style="color:#FF3D00">{total}</code> = 목표 횟수<br>예) <code>{count}!</code> → "1!", "2!" &nbsp;|&nbsp; <code>{count}번</code> → "1번", "2번"</div>
+              </div>
+              <div id="repPreview" style="font-size:11px;color:#6B6B8A;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:6px;"></div>
+            </div>
+          </div>
+
+          <!-- Complete cue -->
+          <div class="voice-block">
+            <div class="voice-row-header">
+              <div class="voice-type-label">🎉 완료 안내</div>
+              <button class="test-btn" onclick="testSpeak('complete')">🔊 테스트</button>
+            </div>
+            <textarea class="voice-textarea" id="completeCue" placeholder="예: 타바타 완료! 수고했습니다." rows="2">타바타 완료! 정말 수고했어요!</textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <button class="save-btn" onclick="saveSettings()">설정 저장 & 적용</button>
+    </div>
+  </div>
+
+</div><!-- app-wrapper -->
+
+<!-- Countdown Overlay -->
+<div class="countdown-overlay" id="countdownOverlay">
+  <div class="countdown-label">준비하세요</div>
+  <div class="countdown-num" id="countdownNum">5</div>
+</div>
+
+<!-- Flash Overlay -->
+<div class="flash-overlay" id="flashOverlay"></div>
+
+<!-- Complete Overlay -->
+<div class="complete-overlay" id="completeOverlay">
+  <div class="complete-title">WELL DONE!</div>
+  <div class="complete-stats" id="completeStats"></div>
+  <button class="complete-btn" onclick="closeComplete()">다시 시작</button>
+</div>
+
+<script>
+// ===== STATE =====
+let cfg = {
+  work: 20, rest: 10, rounds: 8, prep: 5,
+  voiceEnabled: true,
+  voiceIdx: -1, rate: 1.0, pitch: 1.0, vol: 1.0,
+  workCue: '{round}라운드! 시작!',
+  restCue: '휴식. 숨 고르세요.',
+  countdownCue: '곧 시작합니다',
+  countdownCueEnabled: true,
+  completeCue: '타바타 완료! 정말 수고했어요!',
+  countAnnounce: false,      // 남은 시간 음성 카운트
+  countInterval: 1,          // 몇 초마다 읽을지 (1=매초, 5=5초마다 등)
+  countPhase: 'both',        // 'work' | 'rest' | 'both'
+  repEnabled: true,          // 운동 횟수 카운트
+  repTotal: 10,              // 목표 횟수
+  repInterval: 2,            // 몇 초마다 횟수 증가 (운동 시간 / 목표횟수로 자동계산 가능)
+  repMode: 'up',             // 'up'=오름차순(1,2,3...) | 'down'=내림차순(10,9,8...)
+  repCue: '{count}'          // 횟수 안내 문장. {count}=현재횟수, {total}=목표횟수
+};
+
+let state = {
+  running: false,
+  phase: 'idle',
+  timeLeft: 0,
+  currentRound: 0,
+  totalTime: 0,
+  timer: null,
+  repTimer: null,
+  prepTimer: null
+};
+
+let voices = [];
+const TTS = window.speechSynthesis || null;
+let audioCtx = null;
+let audioUnlocked = false;
+
+// ===== AudioContext: unlock on first user gesture =====
+function unlockAudio() {
+  if (audioUnlocked) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Play a silent buffer to unlock
+    const buf = audioCtx.createBuffer(1, 1, 22050);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.start(0);
+    audioUnlocked = true;
+  } catch(e) { console.warn('AudioContext unlock failed:', e); }
+}
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
+
+// Beep: type = 'work' | 'rest' | 'warning' | 'complete'
+function beep(type) {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; } }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const vol = cfg.vol;
+
+  const presets = {
+    work:     { freq: 880, dur: 0.15, type: 'square',   count: 2, gap: 0.18 },
+    rest:     { freq: 440, dur: 0.25, type: 'sine',     count: 1, gap: 0 },
+    warning:  { freq: 660, dur: 0.08, type: 'triangle', count: 3, gap: 0.12 },
+    complete: { freq: 523, dur: 0.2,  type: 'sine',     count: 3, gap: 0.25 }
+  };
+  const p = presets[type] || presets.work;
+
+  for (let i = 0; i < p.count; i++) {
+    const t = audioCtx.currentTime + i * (p.dur + p.gap);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = p.type;
+    osc.frequency.setValueAtTime(p.freq, t);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + p.dur);
+    osc.start(t);
+    osc.stop(t + p.dur + 0.01);
+  }
+}
+
+// ===== INIT TTS voices =====
+function loadVoices() {
+  if (!TTS) return;
+  voices = TTS.getVoices();
+  const sel = document.getElementById('voiceSelect');
+  if (!sel) return;
+  sel.innerHTML = '<option value="-1">기본 음성</option>';
+  voices.forEach((v, i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(o);
+  });
+  const koIdx = voices.findIndex(v => v.lang.startsWith('ko'));
+  if (koIdx >= 0) { sel.value = koIdx; cfg.voiceIdx = koIdx; }
+}
+
+if (TTS) {
+  try { TTS.addEventListener('voiceschanged', loadVoices); } catch(e) {}
+  loadVoices();
+  setTimeout(loadVoices, 500);
+  setTimeout(loadVoices, 1500);
+}
+
+function updateTtsStatus() {
+  const el = document.getElementById('ttsStatus');
+  if (!el) return;
+  if (!TTS) {
+    el.style.borderColor = 'rgba(255,100,100,0.3)';
+    el.innerHTML = '❌ <b>TTS 미지원</b> — 이 브라우저는 음성 합성을 지원하지 않습니다. 벨소리만 사용됩니다.';
+    return;
+  }
+  const vCount = voices.length;
+  const koVoices = voices.filter(v => v.lang.startsWith('ko'));
+  if (vCount === 0) {
+    el.style.borderColor = 'rgba(255,200,0,0.3)';
+    el.innerHTML = '⚠️ 음성 목록 로드 중... <br><small>파일을 다운로드해서 브라우저에서 직접 열면 TTS가 정상 작동합니다.</small>';
+  } else if (koVoices.length === 0) {
+    el.style.borderColor = 'rgba(255,200,0,0.3)';
+    el.innerHTML = `⚠️ 한국어 음성 없음 (총 ${vCount}개 음성 감지) — 다른 언어 음성으로 재생됩니다.`;
+  } else {
+    el.style.borderColor = 'rgba(0,229,100,0.3)';
+    el.innerHTML = `✅ TTS 정상 — 한국어 음성 ${koVoices.length}개 감지됨`;
+  }
+}
+setTimeout(updateTtsStatus, 600);
+setTimeout(updateTtsStatus, 1600);
+
+function initUI() {
+  document.getElementById('workVal').textContent = cfg.work;
+  document.getElementById('restVal').textContent = cfg.rest;
+  document.getElementById('roundsVal').textContent = cfg.rounds;
+  document.getElementById('prepVal').textContent = cfg.prep;
+  document.getElementById('timeNum').textContent = cfg.work;
+  document.getElementById('roundInfo').textContent = `라운드 — / ${cfg.rounds}`;
+  buildDots();
+}
+initUI();
+
+// ===== TABS =====
+function showTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ===== SETTINGS =====
+function adj(key, delta) {
+  const mins = { work: 5, rest: 5, rounds: 1, prep: 1 };
+  const maxs = { work: 300, rest: 300, rounds: 30, prep: 30 };
+  cfg[key] = Math.max(mins[key], Math.min(maxs[key], cfg[key] + delta));
+  document.getElementById(key + 'Val').textContent = cfg[key];
+}
+
+function updateRange(key) {
+  const map = { rate: 'rateRange', pitch: 'pitchRange', vol: 'volRange' };
+  const val = parseFloat(document.getElementById(map[key]).value);
+  const disp = { rate: 'rateVal', pitch: 'pitchVal', vol: 'volVal' };
+  document.getElementById(disp[key]).textContent = val.toFixed(1);
+  cfg[key === 'vol' ? 'vol' : key] = val;
+}
+
+function saveSettings() {
+  cfg.voiceEnabled = document.getElementById('voiceEnabled').checked;
+  cfg.voiceIdx = parseInt(document.getElementById('voiceSelect').value);
+  cfg.rate = parseFloat(document.getElementById('rateRange').value);
+  cfg.pitch = parseFloat(document.getElementById('pitchRange').value);
+  cfg.vol = parseFloat(document.getElementById('volRange').value);
+  cfg.workCue = document.getElementById('workCue').value;
+  cfg.restCue = document.getElementById('restCue').value;
+  cfg.countdownCue = document.getElementById('countdownCue').value;
+  cfg.countdownCueEnabled = document.getElementById('countdownCueEnabled').checked;
+  cfg.completeCue = document.getElementById('completeCue').value;
+  cfg.countAnnounce = document.getElementById('countAnnounce').checked;
+  cfg.countInterval = parseInt(document.getElementById('countIntervalVal').textContent) || 1;
+  cfg.countPhase = document.querySelector('input[name="countPhase"]:checked')?.value || 'both';
+  cfg.repEnabled = document.getElementById('repEnabled').checked;
+  cfg.repTotal = parseInt(document.getElementById('repTotalVal').textContent) || 10;
+  cfg.repMode = document.querySelector('input[name="repMode"]:checked')?.value || 'up';
+  cfg.repCue = document.getElementById('repCue').value || '{count}';
+
+  resetTimer();
+  showTab('timer');
+  document.querySelector('.tab-btn').classList.add('active');
+  document.querySelectorAll('.tab-btn')[1].classList.remove('active');
+}
+
+// ===== SPEECH =====
+function speak(text, priority, beepType) {
+  if (!cfg.voiceEnabled) return;
+  if (beepType) beep(beepType);
+  if (!TTS || !text || !text.trim()) return;
+  try {
+    if (TTS.speaking) TTS.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    // voice 선택: 한국어 우선, 없으면 기본
+    const v = voices[cfg.voiceIdx];
+    if (v) utt.voice = v;
+    utt.lang = (v && v.lang) ? v.lang : 'ko-KR';
+    utt.rate = cfg.rate;
+    utt.pitch = cfg.pitch;
+    utt.volume = cfg.vol;
+    utt.onerror = (e) => console.warn('TTS utt error:', e.error);
+    TTS.speak(utt);
+  } catch(e) { console.warn('TTS error:', e); }
+}
+
+function testSpeak(type) {
+  unlockAudio();
+  // TTS는 반드시 사용자 제스처 직접 호출에서만 동작
+  const texts = {
+    work: parseCue(document.getElementById('workCue').value, 1),
+    rest: parseCue(document.getElementById('restCue').value, 1),
+    complete: document.getElementById('completeCue').value
+  };
+  const beepTypes = { work: 'work', rest: 'rest', complete: 'complete' };
+  if (TTS) TTS.cancel();
+  speak(texts[type], false, beepTypes[type]);
+}
+
+function speakRep(n) {
+  if (!TTS || !cfg.voiceEnabled) return;
+  try {
+    const text = cfg.repCue
+      .replace(/\{count\}/g, n)
+      .replace(/\{total\}/g, cfg.repTotal);
+    if (TTS.speaking) TTS.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    const v = voices[cfg.voiceIdx];
+    if (v) utt.voice = v;
+    utt.lang = (v && v.lang) ? v.lang : 'ko-KR';
+    utt.rate = cfg.rate * 1.1;
+    utt.pitch = cfg.pitch;
+    utt.volume = cfg.vol;
+    TTS.speak(utt);
+  } catch(e) {}
+}
+
+function adjRep(key, delta) {
+  const ids = { total: 'repTotalVal' };
+  const mins = { total: 1 };
+  const maxs = { total: 60 };
+  const el = document.getElementById(ids[key]);
+  if (!el) return;
+  el.textContent = Math.max(mins[key], Math.min(maxs[key], parseInt(el.textContent) + delta));
+  updateRepPreview();
+}
+
+function updateRepPreview() {
+  const el = document.getElementById('repPreview');
+  if (!el) return;
+  const total = parseInt(document.getElementById('repTotalVal')?.textContent) || 10;
+  const workSec = cfg.work;
+  const step = workSec / total;
+  // 실제 발화 타이밍 시뮬레이션 (실수 누적)
+  const ticks = [];
+  let next = step;
+  let count = 0;
+  for (let t = 1; t <= workSec && count < total; t++) {
+    if (t >= next) { ticks.push(t); count++; next += step; }
+  }
+  // 간격 계산
+  const gaps = ticks.map((t, i) => t - (i === 0 ? 0 : ticks[i-1]));
+  const minG = Math.min(...gaps), maxG = Math.max(...gaps);
+  const gapStr = minG === maxG ? `${minG}초` : `${minG}~${maxG}초`;
+  const mode = document.querySelector('input[name="repMode"]:checked')?.value || 'up';
+  const cue = document.getElementById('repCue')?.value || '{count}';
+  const exNums = mode === 'up' ? [1, 2, '…', total] : [total, total - 1, '…', 1];
+  const ex = exNums.map(n => typeof n === 'number'
+    ? cue.replace(/\{count\}/g, n).replace(/\{total\}/g, total) : n).join('  ');
+  el.textContent = `📢 간격 ${gapStr}: ${ex}`;
+}
+
+function toggleRepOptions() {
+  const on = document.getElementById('repEnabled').checked;
+  document.getElementById('repOptions').style.display = on ? 'flex' : 'none';
+  if (on) updateRepPreview();
+}
+
+function speakCount(n) {
+  if (!TTS || !cfg.voiceEnabled) return;
+  try {
+    if (TTS.speaking) TTS.cancel();
+    const utt = new SpeechSynthesisUtterance(String(n));
+    const v = voices[cfg.voiceIdx];
+    if (v) utt.voice = v;
+    utt.lang = (v && v.lang) ? v.lang : 'ko-KR';
+    utt.rate = cfg.rate * 1.1;
+    utt.pitch = cfg.pitch;
+    utt.volume = cfg.vol;
+    TTS.speak(utt);
+  } catch(e) {}
+}
+
+function adjCount(delta) {
+  const el = document.getElementById('countIntervalVal');
+  const cur = parseInt(el.textContent) || 1;
+  el.textContent = Math.max(1, Math.min(30, cur + delta));
+}
+
+function toggleCountOptions() {
+  const on = document.getElementById('countAnnounce').checked;
+  document.getElementById('countOptions').style.display = on ? 'flex' : 'none';
+}
+
+function parseCue(text, round) {
+  return text.replace('{round}', round).replace('{total}', cfg.rounds);
+}
+
+// ===== TIMER CORE =====
+function buildDots() {
+  const container = document.getElementById('roundDots');
+  container.innerHTML = '';
+  for (let i = 0; i < cfg.rounds; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.id = `dot-${i}`;
+    container.appendChild(d);
+  }
+}
+
+function setPhaseUI(phase, timeLeft, totalDur, round) {
+  const numEl = document.getElementById('timeNum');
+  const labelEl = document.getElementById('phaseLabel');
+  const ringEl = document.getElementById('ringProgress');
+  const barEl = document.getElementById('voiceCueBar');
+  const cueEl = document.getElementById('voiceCueText');
+
+  numEl.textContent = timeLeft;
+
+  const progress = totalDur > 0 ? (timeLeft / totalDur) : 1;
+  const circ = 754;
+  ringEl.style.strokeDashoffset = circ * (1 - progress);
+
+  if (phase === 'work') {
+    labelEl.textContent = '운 동';
+    labelEl.className = 'phase-label work';
+    numEl.className = 'time-num work';
+    ringEl.className = 'ring-progress work';
+    barEl.className = 'voice-cue-bar work';
+    cueEl.textContent = parseCue(cfg.workCue, round);
+    cueEl.className = 'voice-cue-text active';
+    document.getElementById('roundInfo').textContent = `라운드 ${round} / ${cfg.rounds}`;
+  } else if (phase === 'rest') {
+    labelEl.textContent = '휴 식';
+    labelEl.className = 'phase-label rest';
+    numEl.className = 'time-num rest';
+    ringEl.className = 'ring-progress rest';
+    barEl.className = 'voice-cue-bar rest';
+    cueEl.textContent = parseCue(cfg.restCue, round);
+    cueEl.className = 'voice-cue-text active';
+  } else if (phase === 'prep') {
+    labelEl.textContent = '준 비';
+    labelEl.className = 'phase-label ready';
+    numEl.className = 'time-num ready';
+    ringEl.className = 'ring-progress ready';
+    barEl.className = 'voice-cue-bar';
+    cueEl.textContent = '준비하세요!';
+    cueEl.className = 'voice-cue-text active';
+  }
+}
+
+function flash(type) {
+  const el = document.getElementById('flashOverlay');
+  el.className = `flash-overlay flash-${type}`;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 200);
+}
+
+function updateDots(currentRound) {
+  for (let i = 0; i < cfg.rounds; i++) {
+    const d = document.getElementById(`dot-${i}`);
+    if (!d) continue;
+    if (i < currentRound - 1) d.className = 'dot done';
+    else if (i === currentRound - 1) d.className = 'dot current';
+    else d.className = 'dot';
+  }
+}
+
+// ===== MAIN TIMER LOGIC =====
+function toggleTimer() {
+  if (state.phase === 'idle' || state.phase === 'done') {
+    startTimer();
+  } else if (state.running) {
+    pauseTimer();
+  } else {
+    resumeTimer();
+  }
+}
+
+function startTimer() {
+  state.currentRound = 0;
+  state.totalTime = 0;
+  buildDots();
+  startPrep();
+}
+
+function startPrep() {
+  state.phase = 'prep';
+  state.running = true;
+  document.getElementById('startBtn').textContent = '⏸';
+  document.getElementById('statusLine').textContent = '준비 카운트다운 중...';
+
+  let prepLeft = cfg.prep;
+  document.getElementById('countdownOverlay').classList.add('show');
+  document.getElementById('countdownNum').textContent = prepLeft;
+
+  setPhaseUI('prep', prepLeft, cfg.prep, 0);
+  speak('준비하세요', true, null);
+
+  state.timer = setInterval(() => {
+    if (!state.running) return;
+    prepLeft--;
+    document.getElementById('countdownNum').textContent = prepLeft;
+    setPhaseUI('prep', prepLeft, cfg.prep, 0);
+    if (prepLeft <= 0) {
+      clearInterval(state.timer);
+      document.getElementById('countdownOverlay').classList.remove('show');
+      startWork();
+    }
+  }, 1000);
+}
+
+function startWork() {
+  if (state.currentRound >= cfg.rounds) { finishTabata(); return; }
+  state.currentRound++;
+  state.phase = 'work';
+  let timeLeft = cfg.work;
+  let warned3 = false;
+
+  flash('work');
+  speak(parseCue(cfg.workCue, state.currentRound), true, 'work');
+  setPhaseUI('work', timeLeft, cfg.work, state.currentRound);
+  updateDots(state.currentRound);
+  document.getElementById('statusLine').textContent = `🔥 운동 중 — 라운드 ${state.currentRound}/${cfg.rounds}`;
+
+  // 1초 메인 타이머 (UI 업데이트 + 3초 경고)
+  state.timer = setInterval(() => {
+    if (!state.running) return;
+    state.totalTime++;
+    timeLeft--;
+
+    if (cfg.countdownCueEnabled && timeLeft === 3 && !warned3) {
+      warned3 = true;
+      speak(cfg.countdownCue, false, 'warning');
+    } else if (!cfg.repEnabled && cfg.countAnnounce && timeLeft > 3 && timeLeft > 0
+      && (cfg.countPhase === 'work' || cfg.countPhase === 'both')
+      && cfg.countInterval > 0 && timeLeft % cfg.countInterval === 0) {
+      speakCount(timeLeft);
+    }
+
+    setPhaseUI('work', timeLeft, cfg.work, state.currentRound);
+    if (timeLeft <= 0) {
+      clearInterval(state.timer);
+      clearTimeout(state.repTimer);
+      if (state.currentRound < cfg.rounds) startRest();
+      else finishTabata();
+    }
+  }, 1000);
+
+  // 횟수 카운트: 독립적인 setTimeout 체인으로 정확한 실수 간격 유지
+  if (cfg.repEnabled && cfg.repTotal > 0) {
+    const stepMs = (cfg.work / cfg.repTotal) * 1000; // 밀리초 단위 간격
+    let repCount = 0;
+    const scheduleRep = () => {
+      state.repTimer = setTimeout(() => {
+        if (!state.running || state.phase !== 'work') return;
+        repCount++;
+        const n = cfg.repMode === 'down' ? (cfg.repTotal - repCount + 1) : repCount;
+        speakRep(n);
+        if (repCount < cfg.repTotal) scheduleRep();
+      }, stepMs);
+    };
+    scheduleRep();
+  }
+}
+
+function startRest() {
+  state.phase = 'rest';
+  let timeLeft = cfg.rest;
+  let warned3 = false;
+
+  flash('rest');
+  speak(parseCue(cfg.restCue, state.currentRound), true, 'rest');
+  setPhaseUI('rest', timeLeft, cfg.rest, state.currentRound);
+  document.getElementById('statusLine').textContent = `💤 휴식 중 — 다음 라운드 ${state.currentRound + 1}/${cfg.rounds}`;
+
+  state.timer = setInterval(() => {
+    if (!state.running) return;
+    state.totalTime++;
+    timeLeft--;
+
+    if (cfg.countdownCueEnabled && timeLeft === 3 && !warned3) {
+      warned3 = true;
+      speak(cfg.countdownCue, false, 'warning');
+    } else if (cfg.countAnnounce && timeLeft > 3 && timeLeft > 0
+      && (cfg.countPhase === 'rest' || cfg.countPhase === 'both')
+      && cfg.countInterval > 0 && timeLeft % cfg.countInterval === 0) {
+      speakCount(timeLeft);
+    }
+
+    setPhaseUI('rest', timeLeft, cfg.rest, state.currentRound);
+    if (timeLeft <= 0) {
+      clearInterval(state.timer);
+      startWork();
+    }
+  }, 1000);
+}
+
+function pauseTimer() {
+  state.running = false;
+  clearTimeout(state.repTimer);
+  state.repTimer = null;
+  document.getElementById('startBtn').textContent = '▶';
+  document.getElementById('statusLine').textContent = '⏸ 일시정지';
+  if (TTS) try { TTS.cancel(); } catch(e) {}
+}
+
+function resumeTimer() {
+  state.running = true;
+  document.getElementById('startBtn').textContent = '⏸';
+  document.getElementById('statusLine').textContent = state.phase === 'work'
+    ? `🔥 운동 중 — 라운드 ${state.currentRound}/${cfg.rounds}`
+    : `💤 휴식 중`;
+}
+
+function resetTimer() {
+  clearInterval(state.timer);
+  clearTimeout(state.repTimer);
+  if (TTS) try { TTS.cancel(); } catch(e) {}
+  document.getElementById('countdownOverlay').classList.remove('show');
+  document.getElementById('completeOverlay').classList.remove('show');
+
+  state = { running: false, phase: 'idle', timeLeft: 0, currentRound: 0, totalTime: 0, timer: null, repTimer: null };
+
+  document.getElementById('phaseLabel').textContent = '준비 완료';
+  document.getElementById('phaseLabel').className = 'phase-label';
+  document.getElementById('timeNum').textContent = cfg.work;
+  document.getElementById('timeNum').className = 'time-num';
+  document.getElementById('ringProgress').style.strokeDashoffset = 0;
+  document.getElementById('ringProgress').className = 'ring-progress ready';
+  document.getElementById('roundInfo').textContent = `라운드 — / ${cfg.rounds}`;
+  document.getElementById('startBtn').textContent = '▶';
+  document.getElementById('statusLine').textContent = '시작 버튼을 눌러 타바타를 시작하세요';
+  document.getElementById('voiceCueText').textContent = '음성 안내가 여기 표시됩니다';
+  document.getElementById('voiceCueText').className = 'voice-cue-text';
+  document.getElementById('voiceCueBar').className = 'voice-cue-bar';
+  buildDots();
+}
+
+function skipPhase() {
+  if (state.phase === 'idle' || state.phase === 'done') return;
+  clearInterval(state.timer);
+  clearTimeout(state.repTimer);
+  state.repTimer = null;
+  if (TTS) try { TTS.cancel(); } catch(e) {}
+  document.getElementById('countdownOverlay').classList.remove('show');
+
+  if (state.phase === 'prep') {
+    state.running = true;
+    startWork();
+  } else if (state.phase === 'work') {
+    if (state.currentRound < cfg.rounds) startRest();
+    else finishTabata();
+  } else if (state.phase === 'rest') {
+    startWork();
+  }
+}
+
+function finishTabata() {
+  clearInterval(state.timer);
+  clearTimeout(state.repTimer);
+  state.phase = 'done';
+  state.running = false;
+
+  // All dots done
+  for (let i = 0; i < cfg.rounds; i++) {
+    const d = document.getElementById(`dot-${i}`);
+    if (d) d.className = 'dot done';
+  }
+
+  speak(cfg.completeCue, true, 'complete');
+  document.getElementById('startBtn').textContent = '▶';
+
+  const mins = Math.floor(state.totalTime / 60);
+  const secs = state.totalTime % 60;
+  document.getElementById('completeStats').innerHTML =
+    `총 운동 시간: ${mins}분 ${secs}초\n운동: ${cfg.work}초 × ${cfg.rounds}라운드\n휴식: ${cfg.rest}초 × ${cfg.rounds - 1}회`;
+  document.getElementById('completeOverlay').classList.add('show');
+  document.getElementById('statusLine').textContent = '✅ 완료!';
+}
+
+function closeComplete() {
+  document.getElementById('completeOverlay').classList.remove('show');
+  resetTimer();
+}
+</script>
+</body>
+</html>
