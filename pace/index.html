@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>러닝 페이스 환산기</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --card: #141414;
+    --card2: #1c1c1c;
+    --accent: #c8ff00;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #666;
+    --border: #2a2a2a;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    padding: 0 0 60px 0;
+    overflow-x: hidden;
+  }
+
+  header {
+    background: var(--bg);
+    padding: 28px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  header p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    padding: 16px 20px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 10px 18px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .panel { display: none; padding: 20px; }
+  .panel.active { display: block; }
+
+  .input-group {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .input-group label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .time-inputs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .time-inputs .field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .time-inputs .field span {
+    font-size: 0.62rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    text-align: center;
+    padding: 10px 4px;
+    outline: none;
+    -moz-appearance: textfield;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus { border-color: var(--accent); }
+
+  .separator {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    color: var(--muted);
+    padding-bottom: 18px;
+  }
+
+  .single-input input {
+    font-size: 2rem;
+    width: 100%;
+  }
+
+  .btn-calc {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.1em;
+    padding: 16px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-calc:active { transform: scale(0.97); background: #aadd00; }
+
+  .results { display: flex; flex-direction: column; gap: 12px; }
+
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+  }
+  .result-card.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .result-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .result-icon.green { background: rgba(200,255,0,0.12); }
+  .result-icon.orange { background: rgba(255,107,53,0.12); }
+  .result-icon.blue { background: rgba(80,160,255,0.12); }
+  .result-icon.purple { background: rgba(180,100,255,0.12); }
+
+  .result-info { flex: 1; }
+  .result-info .label {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .result-info .value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .result-info .value.highlight { color: var(--accent); }
+
+  .error-msg {
+    background: rgba(255,80,80,0.1);
+    border: 1px solid rgba(255,80,80,0.3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.8rem;
+    color: #ff8080;
+    display: none;
+    margin-bottom: 12px;
+  }
+
+  .marathon-badge {
+    display: inline-block;
+    background: rgba(200,255,0,0.1);
+    border: 1px solid rgba(200,255,0,0.25);
+    border-radius: 6px;
+    font-size: 0.6rem;
+    color: var(--accent);
+    padding: 2px 7px;
+    letter-spacing: 0.06em;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 500;
+  }
+
+  .sub-value {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .quick-btns {
+    margin-bottom: 16px;
+  }
+  .quick-btns p {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .quick-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .quick-btn {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.75rem;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .quick-btn:active { background: var(--accent); color: #000; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏃 PACE CALC</h1>
+  <p>러닝 속도 환산기 · KM/H · MIN/KM · SEC/100M · MARATHON</p>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">분/km 입력</div>
+  <div class="tab" onclick="switchTab(1)">시속 입력</div>
+  <div class="tab" onclick="switchTab(2)">100m/초 입력</div>
+  <div class="tab" onclick="switchTab(3)">완주 목표시간</div>
+</div>
+
+<!-- 패널 0: 분/km -->
+<div class="panel active" id="panel0">
+  <div class="quick-btns">
+    <p>빠른 선택</p>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="setMinKm(3,0)">3분</button>
+      <button class="quick-btn" onclick="setMinKm(3,30)">3:30</button>
+      <button class="quick-btn" onclick="setMinKm(4,0)">4분</button>
+      <button class="quick-btn" onclick="setMinKm(4,10)">4:10</button>
+      <button class="quick-btn" onclick="setMinKm(4,30)">4:30</button>
+      <button class="quick-btn" onclick="setMinKm(5,0)">5분</button>
+      <button class="quick-btn" onclick="setMinKm(5,30)">5:30</button>
+      <button class="quick-btn" onclick="setMinKm(6,0)">6분</button>
+    </div>
+  </div>
+  <div class="input-group">
+    <label>km당 페이스 (분 : 초)</label>
+    <div class="time-inputs">
+      <div class="field">
+        <input type="number" id="p0_min" min="0" max="30" placeholder="4">
+        <span>분</span>
+      </div>
+      <div class="separator">:</div>
+      <div class="field">
+        <input type="number" id="p0_sec" min="0" max="59" placeholder="30">
+        <span>초</span>
+      </div>
+    </div>
+  </div>
+  <div class="error-msg" id="err0">올바른 값을 입력해주세요.</div>
+  <button class="btn-calc" onclick="calcFromPace()">환산하기</button>
+  <div class="results" id="res0"></div>
+</div>
+
+<!-- 패널 1: 시속 -->
+<div class="panel" id="panel1">
+  <div class="quick-btns">
+    <p>빠른 선택</p>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="setKmh(8)">8 km/h</button>
+      <button class="quick-btn" onclick="setKmh(10)">10 km/h</button>
+      <button class="quick-btn" onclick="setKmh(12)">12 km/h</button>
+      <button class="quick-btn" onclick="setKmh(13)">13 km/h</button>
+      <button class="quick-btn" onclick="setKmh(14)">14 km/h</button>
+      <button class="quick-btn" onclick="setKmh(15)">15 km/h</button>
+      <button class="quick-btn" onclick="setKmh(16)">16 km/h</button>
+      <button class="quick-btn" onclick="setKmh(20)">20 km/h</button>
+    </div>
+  </div>
+  <div class="input-group">
+    <label>시속 (km/h)</label>
+    <div class="single-input">
+      <input type="number" id="p1_kmh" min="1" max="50" step="0.1" placeholder="12.0">
+    </div>
+  </div>
+  <div class="error-msg" id="err1">올바른 값을 입력해주세요.</div>
+  <button class="btn-calc" onclick="calcFromKmh()">환산하기</button>
+  <div class="results" id="res1"></div>
+</div>
+
+<!-- 패널 2: 100m/초 -->
+<div class="panel" id="panel2">
+  <div class="input-group">
+    <label>100m당 소요 시간 (초)</label>
+    <div class="single-input">
+      <input type="number" id="p2_sec" min="10" max="120" step="0.1" placeholder="30">
+    </div>
+  </div>
+  <div class="error-msg" id="err2">올바른 값을 입력해주세요.</div>
+  <button class="btn-calc" onclick="calcFrom100m()">환산하기</button>
+  <div class="results" id="res2"></div>
+</div>
+
+<!-- 패널 3: 완주 목표시간 -->
+<div class="panel" id="panel3">
+  <div class="quick-btns">
+    <p>목표 완주 시간</p>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="setGoal(2,30,0)">서브2:30</button>
+      <button class="quick-btn" onclick="setGoal(3,0,0)">서브3</button>
+      <button class="quick-btn" onclick="setGoal(3,30,0)">서브3:30</button>
+      <button class="quick-btn" onclick="setGoal(4,0,0)">서브4</button>
+      <button class="quick-btn" onclick="setGoal(4,30,0)">서브4:30</button>
+      <button class="quick-btn" onclick="setGoal(5,0,0)">서브5</button>
+    </div>
+  </div>
+  <div class="input-group">
+    <label>풀코스 목표 시간 (시 : 분 : 초)</label>
+    <div class="time-inputs">
+      <div class="field">
+        <input type="number" id="p3_h" min="1" max="9" placeholder="4">
+        <span>시간</span>
+      </div>
+      <div class="separator">:</div>
+      <div class="field">
+        <input type="number" id="p3_m" min="0" max="59" placeholder="0">
+        <span>분</span>
+      </div>
+      <div class="separator">:</div>
+      <div class="field">
+        <input type="number" id="p3_s" min="0" max="59" placeholder="0">
+        <span>초</span>
+      </div>
+    </div>
+  </div>
+  <div class="error-msg" id="err3">올바른 값을 입력해주세요.</div>
+  <button class="btn-calc" onclick="calcFromMarathon()">환산하기</button>
+  <div class="results" id="res3"></div>
+</div>
+
+<script>
+const MARATHON = 42.195;
+
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+function fmtSec(totalSec) {
+  const m = Math.floor(totalSec / 60);
+  const s = Math.round(totalSec % 60);
+  return s === 60 ? `${m+1}분 00초` : `${m}분 ${String(s).padStart(2,'0')}초`;
+}
+
+function fmtMarathon(totalSec) {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = Math.round(totalSec % 60);
+  return `${h}시간 ${String(m).padStart(2,'0')}분 ${String(s).padStart(2,'0')}초`;
+}
+
+function showResults(containerId, cards) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  cards.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'result-card';
+    div.innerHTML = `
+      <div class="result-icon ${c.color}">${c.icon}</div>
+      <div class="result-info">
+        <div class="label">${c.label}</div>
+        <div class="value ${c.highlight ? 'highlight' : ''}">${c.value}</div>
+        ${c.sub ? `<div class="sub-value">${c.sub}</div>` : ''}
+      </div>
+    `;
+    el.appendChild(div);
+    setTimeout(() => div.classList.add('show'), i * 80);
+  });
+}
+
+function showErr(id, show) {
+  document.getElementById(id).style.display = show ? 'block' : 'none';
+}
+
+// 분/km → 나머지
+function setMinKm(m, s) {
+  document.getElementById('p0_min').value = m;
+  document.getElementById('p0_sec').value = s;
+  calcFromPace();
+}
+
+function calcFromPace() {
+  const min = parseFloat(document.getElementById('p0_min').value) || 0;
+  const sec = parseFloat(document.getElementById('p0_sec').value) || 0;
+  const totalSec = min * 60 + sec;
+  if (totalSec <= 0) { showErr('err0', true); return; }
+  showErr('err0', false);
+  const kmh = 3600 / totalSec;
+  const sec100 = totalSec / 10;
+  const marathonSec = totalSec * MARATHON;
+  showResults('res0', [
+    { icon: '⚡', color: 'green', label: '시속', value: `${kmh.toFixed(2)} km/h`, highlight: true },
+    { icon: '📏', color: 'orange', label: '100m당 소요시간', value: `${sec100.toFixed(1)}초` },
+    { icon: '🏅', color: 'purple', label: '풀코스 완주 예상', value: fmtMarathon(marathonSec), sub: `42.195km 기준` }
+  ]);
+}
+
+// 시속 → 나머지
+function setKmh(v) {
+  document.getElementById('p1_kmh').value = v;
+  calcFromKmh();
+}
+
+function calcFromKmh() {
+  const kmh = parseFloat(document.getElementById('p1_kmh').value);
+  if (!kmh || kmh <= 0) { showErr('err1', true); return; }
+  showErr('err1', false);
+  const secPerKm = 3600 / kmh;
+  const sec100 = secPerKm / 10;
+  const marathonSec = secPerKm * MARATHON;
+  showResults('res1', [
+    { icon: '🕐', color: 'green', label: 'km당 페이스', value: fmtSec(secPerKm), highlight: true },
+    { icon: '📏', color: 'orange', label: '100m당 소요시간', value: `${sec100.toFixed(1)}초` },
+    { icon: '🏅', color: 'purple', label: '풀코스 완주 예상', value: fmtMarathon(marathonSec), sub: `42.195km 기준` }
+  ]);
+}
+
+// 100m/초 → 나머지
+function calcFrom100m() {
+  const s = parseFloat(document.getElementById('p2_sec').value);
+  if (!s || s <= 0) { showErr('err2', true); return; }
+  showErr('err2', false);
+  const secPerKm = s * 10;
+  const kmh = 3600 / secPerKm;
+  const marathonSec = secPerKm * MARATHON;
+  showResults('res2', [
+    { icon: '🕐', color: 'green', label: 'km당 페이스', value: fmtSec(secPerKm), highlight: true },
+    { icon: '⚡', color: 'orange', label: '시속', value: `${kmh.toFixed(2)} km/h` },
+    { icon: '🏅', color: 'purple', label: '풀코스 완주 예상', value: fmtMarathon(marathonSec), sub: `42.195km 기준` }
+  ]);
+}
+
+// 완주 목표시간 → 나머지
+function setGoal(h, m, s) {
+  document.getElementById('p3_h').value = h;
+  document.getElementById('p3_m').value = m;
+  document.getElementById('p3_s').value = s;
+  calcFromMarathon();
+}
+
+function calcFromMarathon() {
+  const h = parseFloat(document.getElementById('p3_h').value) || 0;
+  const m = parseFloat(document.getElementById('p3_m').value) || 0;
+  const s = parseFloat(document.getElementById('p3_s').value) || 0;
+  const totalSec = h * 3600 + m * 60 + s;
+  if (totalSec <= 0) { showErr('err3', true); return; }
+  showErr('err3', false);
+  const secPerKm = totalSec / MARATHON;
+  const kmh = 3600 / secPerKm;
+  const sec100 = secPerKm / 10;
+  showResults('res3', [
+    { icon: '🕐', color: 'green', label: 'km당 페이스', value: fmtSec(secPerKm), highlight: true },
+    { icon: '⚡', color: 'orange', label: '시속', value: `${kmh.toFixed(2)} km/h` },
+    { icon: '📏', color: 'blue', label: '100m당 소요시간', value: `${sec100.toFixed(1)}초` }
+  ]);
+}
+
+// Enter 키 지원
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const active = document.querySelector('.panel.active').id;
+  if (active === 'panel0') calcFromPace();
+  else if (active === 'panel1') calcFromKmh();
+  else if (active === 'panel2') calcFrom100m();
+  else if (active === 'panel3') calcFromMarathon();
+});
+</script>
+</body>
+</html>
