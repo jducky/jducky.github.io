@@ -22,6 +22,3 @@ __pycache__/
 *.tmp
 *.orig
 image-puzzle/jigsaw.html
-
-# Generated artifacts
-image-puzzle/assets/packs/manifest.json

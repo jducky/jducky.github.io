@@ -1,0 +1,112 @@
+{
+  "categories": [
+    {
+      "id": "landscape",
+      "name": "landscape",
+      "colors": [
+        "#5b8def",
+        "#8ed1fc",
+        "#ffe29f",
+        "#f76b1c"
+      ],
+      "levels": [
+        {
+          "id": "landscape-1",
+          "name": "img_20260105_121151 (02-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_121151 (02-100).png"
+        },
+        {
+          "id": "landscape-2",
+          "name": "img_20260105_121638 (06-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_121638 (06-100).png"
+        },
+        {
+          "id": "landscape-3",
+          "name": "img_20260105_121751 (07-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_121751 (07-100).png"
+        },
+        {
+          "id": "landscape-4",
+          "name": "img_20260105_122243 (11-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_122243 (11-100).png"
+        },
+        {
+          "id": "landscape-5",
+          "name": "img_20260105_123051 (01-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_123051 (01-100).png"
+        },
+        {
+          "id": "landscape-6",
+          "name": "img_20260105_125137 (19-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_125137 (19-100).png"
+        },
+        {
+          "id": "landscape-7",
+          "name": "img_20260105_125246 (20-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_125246 (20-100).png"
+        },
+        {
+          "id": "landscape-8",
+          "name": "img_20260105_125355 (21-100)",
+          "size": 4,
+          "image": "./assets/packs/landscape/img_20260105_125355 (21-100).png"
+        }
+      ]
+    },
+    {
+      "id": "my-pack",
+      "name": "my pack",
+      "colors": [
+        "#1f8f5f",
+        "#96d98d",
+        "#fff0b3",
+        "#ff8b5e"
+      ],
+      "levels": [
+        {
+          "id": "my-pack-1",
+          "name": "img_20260315_183442 (05-20)",
+          "size": 4,
+          "image": "./assets/packs/my-pack/img_20260315_183442 (05-20).png"
+        },
+        {
+          "id": "my-pack-2",
+          "name": "img_20260315_183930 (14-20)",
+          "size": 4,
+          "image": "./assets/packs/my-pack/img_20260315_183930 (14-20).png"
+        },
+        {
+          "id": "my-pack-3",
+          "name": "img_20260315_184001 (15-20)",
+          "size": 4,
+          "image": "./assets/packs/my-pack/img_20260315_184001 (15-20).png"
+        },
+        {
+          "id": "my-pack-4",
+          "name": "img_20260316_094857 (01-08)",
+          "size": 4,
+          "image": "./assets/packs/my-pack/img_20260316_094857 (01-08).png"
+        },
+        {
+          "id": "my-pack-5",
+          "name": "img_20260316_094954 (03-08)",
+          "size": 4,
+          "image": "./assets/packs/my-pack/img_20260316_094954 (03-08).png"
+        },
+        {
+          "id": "my-pack-6",
+          "name": "img_20260316_095025 (04-08)",
+          "size": 4,
+          "image": "./assets/packs/my-pack/img_20260316_095025 (04-08).png"
+        }
+      ]
+    }
+  ]
+}
