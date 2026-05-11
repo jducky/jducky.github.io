@@ -1,0 +1,113 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Jigsaw Link Puzzle</title>
+  <script>window.APP_ASSET_VERSION = "20260511-1";</script>
+  <link rel="stylesheet" href="./styles.css?v=20260511-1">
+</head>
+<body>
+  <div class="shell">
+    <section class="screen active" id="home-screen">
+      <div class="hero">
+        <div class="eyebrow">Mobile MVP</div>
+        <h1>Jigsaw Link</h1>
+        <p class="lead">조각을 맞추면 인접한 정답 타일이 자동으로 연결됩니다. 연결된 퍼즐은 한 번에 함께 움직입니다.</p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <strong id="total-stars">0</strong>
+            <span>총 별점</span>
+          </div>
+          <div class="hero-stat">
+            <strong id="cleared-count">0</strong>
+            <span>클리어</span>
+          </div>
+          <div class="hero-stat">
+            <div class="recent-thumb"><canvas id="recent-thumb-canvas" width="96" height="64"></canvas></div>
+            <span></span>
+          </div>
+        </div>
+        <div class="cta-row hero-actions">
+          <button class="btn btn-primary" id="continue-btn">이어하기</button>
+          <button class="btn btn-secondary" id="random-btn">랜덤 시작</button>
+          <button class="btn btn-secondary" id="upload-btn">이미지 추가</button>
+        </div>
+      </div>
+      <div class="section-title">
+        <h2>카테고리</h2>
+        <span>각 4개 레벨, 모바일 터치 최적화</span>
+      </div>
+      <div class="category-list" id="category-list"></div>
+      <p class="footer-note">진행 데이터는 `localStorage`에 저장됩니다. WebView 래핑 시 Android 브릿지로 교체 가능합니다.</p>
+    </section>
+
+    <section class="screen" id="level-screen">
+      <div class="topbar">
+        <button class="btn btn-ghost" id="back-home-btn">홈</button>
+        <div>
+          <h2 id="level-screen-title">레벨</h2>
+          <div class="tiny" id="level-screen-subtitle"></div>
+        </div>
+        <button class="btn btn-ghost" id="reset-category-btn">기록 초기화</button>
+      </div>
+      <div class="level-grid" id="level-grid"></div>
+    </section>
+
+    <section class="screen" id="game-screen">
+      <div class="game-header">
+        <div class="topbar">
+          <button class="btn btn-ghost" id="game-back-btn">레벨</button>
+          <div>
+            <h2 id="game-title">레벨</h2>
+            <div class="tiny" id="game-subtitle"></div>
+          </div>
+          <button class="btn btn-ghost" id="restart-btn">재시작</button>
+        </div>
+        <div class="game-stats">
+          <div class="game-stat"><strong id="move-stat">0</strong><span>이동</span></div>
+          <div class="game-stat"><strong id="link-stat">0</strong><span>연결</span></div>
+          <div class="game-stat"><strong id="hint-stat">3</strong><span>힌트</span></div>
+          <div class="game-stat"><strong id="star-stat">★★★</strong><span>예상 별점</span></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-secondary" id="shuffle-btn">셔플</button>
+        <button class="btn btn-secondary" id="hint-btn">원본 보기</button>
+        <button class="btn btn-primary" id="next-level-btn" disabled>다음</button>
+      </div>
+      <div class="panel board-panel">
+        <div class="board-wrap" id="board-wrap">
+          <div class="board-grid" id="board-grid"></div>
+          <div class="board" id="board"></div>
+          <div class="hint-overlay" id="hint-overlay">
+            <div class="hint-card">
+              <canvas id="hint-canvas" width="480" height="480"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="preview-panel" id="summary-panel">
+          <button class="preview-toggle" id="preview-toggle" type="button">원본 보기 열기</button>
+          <div class="preview-row" id="preview-row">
+            <div class="preview"><canvas id="preview-canvas" width="70" height="70"></canvas></div>
+            <div class="preview-copy">
+              <strong id="summary-title">원본 미리보기</strong>
+              <span id="summary-text">힌트와 별개로 참고용 미리보기입니다. 필요할 때만 열어서 확인할 수 있습니다.</span>
+              <div class="summary-stars" id="clear-stars"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <input class="hidden-input" id="image-input" type="file" accept="image/*">
+  <script src="./levels.js?v=20260511-1"></script>
+  <script src="./storage.js?v=20260511-1"></script>
+  <script src="./image-utils.js?v=20260511-1"></script>
+  <script src="./game.js?v=20260511-1"></script>
+</body>
+</html>

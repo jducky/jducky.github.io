@@ -1,4 +1,5 @@
 .vscode/
+.idea/
 
 # OS files
 .DS_Store
@@ -8,3 +9,19 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Python / tool caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.cache/
+
+# Local backup / scratch files
+*.bak
+*.tmp
+*.orig
+image-puzzle/jigsaw.html
+
+# Generated artifacts
+image-puzzle/assets/packs/manifest.json
