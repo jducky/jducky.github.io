@@ -428,7 +428,8 @@ function renderGameFrame() {
   els.boardGrid.style.setProperty("--grid-size", level.size);
   els.board.innerHTML = "";
   els.boardWrap.classList.remove("is-complete");
-  els.nextLevelBtn.disabled = !puzzle.completed || !puzzle.nextLevelId;
+  els.boardWrap.style.removeProperty("--complete-image");
+  els.nextLevelBtn.disabled = !puzzle.nextLevelId;
   els.summaryPanel.classList.remove("completed");
   els.summaryPanel.classList.remove("expanded");
   els.previewToggle.textContent = "원본 보기 열기";
@@ -549,12 +550,14 @@ function nextLevelFor(levelId) {
   if (!image) {
     const list = categoryLevels(level.categoryId);
     const index = list.findIndex((item) => item.id === levelId);
-    return index >= 0 && index < list.length - 1 ? list[index + 1].id : null;
+    if (index < 0 || !list.length) return null;
+    return list[(index + 1) % list.length]?.id || null;
   }
   const images = categoryImages(level.categoryId);
   const index = images.findIndex((item) => item.id === image.id);
-  if (index < 0 || index >= images.length - 1) return null;
-  const nextImageLevels = imageLevels(images[index + 1].id);
+  if (index < 0 || !images.length) return null;
+  const nextImage = images[(index + 1) % images.length];
+  const nextImageLevels = imageLevels(nextImage.id);
   const sameSizeLevel = nextImageLevels.find((item) => item.size === level.size);
   return sameSizeLevel?.id || nextImageLevels[0]?.id || null;
 }
@@ -583,7 +586,10 @@ function handlePointerDown(event) {
     offsetX,
     offsetY,
     originRow: tile.row,
-    originCol: tile.col
+    originCol: tile.col,
+    pointerId: event.pointerId,
+    lastClientX: event.clientX,
+    lastClientY: event.clientY
   };
 
   members.forEach((item) => {
@@ -597,6 +603,9 @@ function handlePointerDown(event) {
 function handlePointerMove(event) {
   const drag = state.puzzle?.drag;
   if (!drag) return;
+  if (typeof drag.pointerId === "number" && event.pointerId !== drag.pointerId) return;
+  drag.lastClientX = event.clientX;
+  drag.lastClientY = event.clientY;
   const size = boardTileSize();
   const rect = els.boardWrap.getBoundingClientRect();
   const baseX = event.clientX - rect.left - drag.offsetX;
@@ -610,14 +619,16 @@ function handlePointerMove(event) {
   });
 }
 
-function handlePointerUp(event) {
+function finishDrag(clientX, clientY) {
   const drag = state.puzzle?.drag;
   if (!drag) return;
 
   const size = boardTileSize();
   const rect = els.boardWrap.getBoundingClientRect();
-  const baseX = event.clientX - rect.left - drag.offsetX;
-  const baseY = event.clientY - rect.top - drag.offsetY;
+  const resolvedClientX = Number.isFinite(clientX) ? clientX : drag.lastClientX;
+  const resolvedClientY = Number.isFinite(clientY) ? clientY : drag.lastClientY;
+  const baseX = resolvedClientX - rect.left - drag.offsetX;
+  const baseY = resolvedClientY - rect.top - drag.offsetY;
   const snapTarget = getSnapTarget(drag, baseX, baseY, size);
   const targetCol = snapTarget.col;
   const targetRow = snapTarget.row;
@@ -667,6 +678,20 @@ function handlePointerUp(event) {
 
   layoutTiles();
   checkCompletion();
+}
+
+function handlePointerUp(event) {
+  const drag = state.puzzle?.drag;
+  if (!drag) return;
+  if (typeof drag.pointerId === "number" && event.pointerId !== drag.pointerId) return;
+  finishDrag(event.clientX, event.clientY);
+}
+
+function handlePointerCancel(event) {
+  const drag = state.puzzle?.drag;
+  if (!drag) return;
+  if (typeof drag.pointerId === "number" && event.pointerId !== drag.pointerId) return;
+  finishDrag(drag.lastClientX, drag.lastClientY);
 }
 
 function tileAt(row, col) {
@@ -937,6 +962,7 @@ function completeLevel() {
   syncHome();
   renderLevelSelect();
 
+  els.boardWrap.style.setProperty("--complete-image", `url("${state.sourceCanvas.toDataURL("image/png")}")`);
   els.summaryPanel.classList.add("completed");
   els.boardWrap.classList.add("is-complete");
   els.summaryTitle.textContent = "완성";
@@ -1013,6 +1039,12 @@ function resetCategoryProgress() {
 }
 
 function openImagePicker() {
+  if (!els.imageInput) return;
+  els.imageInput.value = "";
+  if (typeof els.imageInput.showPicker === "function") {
+    els.imageInput.showPicker();
+    return;
+  }
   els.imageInput.click();
 }
 
@@ -1084,6 +1116,7 @@ function handleImageSelection(event) {
 function attachGlobalEvents() {
   document.addEventListener("pointermove", handlePointerMove);
   document.addEventListener("pointerup", handlePointerUp);
+  document.addEventListener("pointercancel", handlePointerCancel);
   window.addEventListener("resize", () => {
     if (state.puzzle) layoutTiles();
   });

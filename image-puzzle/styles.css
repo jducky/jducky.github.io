@@ -424,6 +424,7 @@ h1{
   aspect-ratio:1;
   border-radius:22px;
   overflow:hidden;
+  touch-action:none;
   background:
     linear-gradient(0deg, rgba(250,245,236,.96), rgba(250,245,236,.96)),
     linear-gradient(45deg, rgba(215,92,55,.08), rgba(255,204,102,.1));
@@ -443,8 +444,18 @@ h1{
   position:absolute;
   inset:0;
 }
+.board-wrap.is-complete{
+  background-image:var(--complete-image);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+}
 .board-wrap.is-complete .board-grid{
   opacity:0;
+  display:none;
+}
+.board-wrap.is-complete .board{
+  display:none;
 }
 .tile{
   position:absolute;
@@ -580,7 +591,15 @@ h1{
   text-align:center;
   line-height:1.5;
 }
-.hidden-input{display:none;}
+.hidden-input{
+  position:fixed;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+  left:-9999px;
+  top:0;
+}
 .is-hidden{display:none !important;}
 @media (max-width: 420px){
   .hero-actions{
