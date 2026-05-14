@@ -8,8 +8,8 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Jigsaw Link Puzzle</title>
-  <script>window.APP_ASSET_VERSION = "20260514-4";</script>
-  <link rel="stylesheet" href="./styles.css?v=20260514-4">
+  <script>window.APP_ASSET_VERSION = "20260514-12";</script>
+  <link rel="stylesheet" href="./styles.css?v=20260514-12">
 </head>
 <body>
   <div class="shell">
@@ -36,6 +36,7 @@
           <button class="btn btn-primary" id="continue-btn">이어하기</button>
           <button class="btn btn-secondary" id="random-btn">랜덤 시작</button>
           <button class="btn btn-secondary" id="upload-btn">이미지 추가</button>
+          <button class="btn btn-secondary" id="folder-upload-btn">폴더 추가</button>
         </div>
       </div>
       <div class="section-title">
@@ -43,7 +44,7 @@
         <span>각 4개 레벨, 모바일 터치 최적화</span>
       </div>
       <div class="category-list" id="category-list"></div>
-      <p class="footer-note">진행 데이터는 `localStorage`에 저장됩니다. WebView 래핑 시 Android 브릿지로 교체 가능합니다.</p>
+      <p class="footer-note">개인 이미지는 이 기기의 브라우저 저장소(IndexedDB)에만 저장됩니다. 공용 이미지팩과 별도로 다른 사용자에게는 보이지 않습니다.</p>
     </section>
 
     <section class="screen" id="level-screen">
@@ -66,7 +67,7 @@
             <h2 id="game-title">레벨</h2>
             <div class="tiny" id="game-subtitle"></div>
           </div>
-          <button class="btn btn-ghost" id="restart-btn">재시작</button>
+          <button class="btn btn-ghost" id="restart-btn">셔플</button>
         </div>
         <div class="game-stats">
           <div class="game-stat"><strong id="move-stat">0</strong><span>이동</span></div>
@@ -76,8 +77,9 @@
         </div>
       </div>
       <div class="toolbar">
-        <button class="btn btn-secondary" id="shuffle-btn">셔플</button>
         <button class="btn btn-secondary" id="hint-btn">원본 보기</button>
+        <button class="btn btn-secondary" id="global-random-btn">전체 랜덤</button>
+        <button class="btn btn-secondary" id="category-random-btn">카테고리 랜덤</button>
         <button class="btn btn-primary" id="next-level-btn" disabled>다음</button>
       </div>
       <div class="panel board-panel">
@@ -104,10 +106,11 @@
       </div>
     </section>
   </div>
-  <input class="hidden-input" id="image-input" type="file" accept="image/*">
-  <script src="./levels.js?v=20260514-4"></script>
-  <script src="./storage.js?v=20260514-4"></script>
-  <script src="./image-utils.js?v=20260514-4"></script>
-  <script src="./game.js?v=20260514-4"></script>
+  <input class="hidden-input" id="image-input" type="file" accept="image/*" multiple>
+  <input class="hidden-input" id="folder-input" type="file" accept="image/*" multiple webkitdirectory directory>
+  <script src="./levels.js?v=20260514-12"></script>
+  <script src="./storage.js?v=20260514-12"></script>
+  <script src="./image-utils.js?v=20260514-12"></script>
+  <script src="./game.js?v=20260514-12"></script>
 </body>
 </html>

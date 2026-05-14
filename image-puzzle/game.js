@@ -12,6 +12,7 @@ const els = {
   continueBtn: document.getElementById("continue-btn"),
   randomBtn: document.getElementById("random-btn"),
   uploadBtn: document.getElementById("upload-btn"),
+  folderUploadBtn: document.getElementById("folder-upload-btn"),
   levelGrid: document.getElementById("level-grid"),
   levelTitle: document.getElementById("level-screen-title"),
   levelSubtitle: document.getElementById("level-screen-subtitle"),
@@ -31,7 +32,10 @@ const els = {
   linkStat: document.getElementById("link-stat"),
   hintStat: document.getElementById("hint-stat"),
   starStat: document.getElementById("star-stat"),
+  categoryRandomBtn: document.getElementById("category-random-btn"),
+  globalRandomBtn: document.getElementById("global-random-btn"),
   imageInput: document.getElementById("image-input"),
+  folderInput: document.getElementById("folder-input"),
   gameTitle: document.getElementById("game-title"),
   gameSubtitle: document.getElementById("game-subtitle"),
   nextLevelBtn: document.getElementById("next-level-btn")
@@ -183,6 +187,29 @@ function showDifficultySelect(imageId, categoryId = state.selectedCategoryId) {
   showScreen("level");
 }
 
+function preferredLevelSize() {
+  return state.puzzle?.size
+    || levelById(state.activeLevelId)?.size
+    || levelById(state.progress.ongoing?.levelId)?.size
+    || 3;
+}
+
+function preferredLevelForImage(imageId, preferredSize = preferredLevelSize()) {
+  const levels = imageLevels(imageId);
+  return levels.find((level) => level.size === preferredSize)
+    || levels.find((level) => level.size === 3)
+    || levels[0]
+    || null;
+}
+
+function startPreferredLevelForImage(imageId, categoryId = imageRecordById(imageId)?.categoryId) {
+  const level = preferredLevelForImage(imageId);
+  if (!level) return;
+  state.selectedCategoryId = categoryId || level.categoryId;
+  state.selectedImageId = imageId;
+  startLevel(level.id, false);
+}
+
 function showScreen(name) {
   Object.entries(screens).forEach(([key, node]) => {
     if (node) {
@@ -312,40 +339,83 @@ function renderLevelSelect() {
   if (state.levelScreenMode !== "difficulty" || !image) {
     els.levelTitle.textContent = `${category.name} 이미지`;
     els.levelSubtitle.textContent = "이미지를 선택하면 다음 화면에서 난이도를 고를 수 있습니다.";
-    images.forEach((imageItem) => {
-      const levels = imageLevels(imageItem.id);
-      const clearedCount = levels.filter((level) => state.progress.levels[level.id]?.cleared).length;
-      const bestStars = levels.reduce((best, level) => Math.max(best, state.progress.levels[level.id]?.stars || 0), 0);
-      const card = document.createElement("div");
-      card.className = "level-card image-card";
-      card.innerHTML = `
-        <button class="image-card-main" type="button">
-          <div class="level-thumb">
-            <canvas width="140" height="140"></canvas>
-          </div>
-          <div class="level-meta">
-            <strong>${imageItem.name}</strong>
-            <span>${clearedCount} / ${levels.length} 난이도 완료</span>
-            <div class="stars">${renderStars(bestStars)}</div>
-          </div>
-        </button>
-        ${category.id === "custom" ? '<button class="image-delete-btn" type="button">삭제</button>' : ""}
-      `;
-      drawImageCardThumbnail(card.querySelector("canvas"), imageItem);
-      card.querySelector(".image-card-main").addEventListener("click", () => {
-        showDifficultySelect(imageItem.id, category.id);
+    if (category.id === "custom") {
+      renderCustomImageGroups(images, category);
+    } else {
+      images.forEach((imageItem) => {
+        els.levelGrid.appendChild(createImageSelectCard(imageItem, category));
       });
-      if (category.id === "custom") {
-        card.querySelector(".image-delete-btn").addEventListener("click", () => {
-          deleteCustomImage(imageItem.id);
-        });
-      }
-      els.levelGrid.appendChild(card);
-    });
+    }
     return;
   }
 
   renderDifficultySelect(image, category);
+}
+
+function createImageSelectCard(imageItem, category) {
+  const levels = imageLevels(imageItem.id);
+  const clearedCount = levels.filter((level) => state.progress.levels[level.id]?.cleared).length;
+  const bestStars = levels.reduce((best, level) => Math.max(best, state.progress.levels[level.id]?.stars || 0), 0);
+  const card = document.createElement("div");
+  card.className = "level-card image-card";
+  card.innerHTML = `
+    <button class="image-card-main" type="button">
+      <div class="level-thumb">
+        <canvas width="140" height="140"></canvas>
+      </div>
+      <div class="level-meta">
+        <strong>${imageItem.name}</strong>
+        <span>${clearedCount} / ${levels.length} 난이도 완료</span>
+        <div class="stars">${renderStars(bestStars)}</div>
+      </div>
+    </button>
+    ${category.id === "custom" ? '<button class="image-delete-btn" type="button">삭제</button>' : ""}
+  `;
+  drawImageCardThumbnail(card.querySelector("canvas"), imageItem);
+  card.querySelector(".image-card-main").addEventListener("click", () => {
+    startPreferredLevelForImage(imageItem.id, category.id);
+  });
+  if (category.id === "custom") {
+    card.querySelector(".image-delete-btn").addEventListener("click", () => {
+      deleteCustomImage(imageItem.id);
+    });
+  }
+  return card;
+}
+
+function customImageGroups(images) {
+  const groups = new Map();
+  images.forEach((imageItem) => {
+    const customImage = customImages().find((item) => item.id === imageItem.id);
+    const groupLabel = customImage?.sourceType === "folder"
+      ? (customImage.sourceGroup || "폴더 추가")
+      : "직접 추가";
+    if (!groups.has(groupLabel)) {
+      groups.set(groupLabel, []);
+    }
+    groups.get(groupLabel).push(imageItem);
+  });
+  return Array.from(groups.entries());
+}
+
+function renderCustomImageGroups(images, category) {
+  customImageGroups(images).forEach(([groupLabel, groupImages]) => {
+    const section = document.createElement("section");
+    section.className = "image-group-section";
+
+    const title = document.createElement("div");
+    title.className = "image-group-title";
+    title.innerHTML = `<strong>${groupLabel}</strong><span>${groupImages.length}장</span>`;
+    section.appendChild(title);
+
+    const grid = document.createElement("div");
+    grid.className = "image-group-grid";
+    groupImages.forEach((imageItem) => {
+      grid.appendChild(createImageSelectCard(imageItem, category));
+    });
+    section.appendChild(grid);
+    els.levelGrid.appendChild(section);
+  });
 }
 
 function renderDifficultySelect(image, category = selectedCategory()) {
@@ -357,9 +427,6 @@ function renderDifficultySelect(image, category = selectedCategory()) {
   const card = document.createElement("div");
   card.className = "level-card difficulty-card";
   card.innerHTML = `
-    <div class="level-thumb">
-      <canvas width="180" height="180"></canvas>
-    </div>
     <div class="level-meta">
       <strong>${image.name}</strong>
       <span>${category.name} · ${clearedCount} / ${levels.length} 난이도 완료</span>
@@ -368,8 +435,7 @@ function renderDifficultySelect(image, category = selectedCategory()) {
     </div>
   `;
   els.levelTitle.textContent = image.name;
-  els.levelSubtitle.textContent = "퍼즐 크기를 선택해서 시작합니다. 그리드는 나중에 더 확장할 수 있습니다.";
-  drawImageCardThumbnail(card.querySelector("canvas"), image);
+  els.levelSubtitle.textContent = "난이도만 선택해서 바로 다시 시작합니다.";
   const difficultyGrid = card.querySelector(".difficulty-grid");
   levels.forEach((level) => {
     const button = document.createElement("button");
@@ -1093,13 +1159,41 @@ function goToNextLevel() {
   startLevel(state.puzzle.nextLevelId, false);
 }
 
+function randomLevelFrom(levels, excludedLevelId = null) {
+  if (!levels.length) return null;
+  const pool = excludedLevelId && levels.length > 1
+    ? levels.filter((level) => level.id !== excludedLevelId)
+    : levels.slice();
+  const candidates = pool.length ? pool : levels;
+  return candidates[Math.floor(Math.random() * candidates.length)] || null;
+}
+
+function startLevelFromRandomPool(levels) {
+  const images = Array.from(new Map(levels.map((level) => {
+    const imageId = level.imageId || level.id;
+    return [imageId, imageRecordById(imageId)];
+  })).values()).filter(Boolean);
+  const currentImageId = state.puzzle?.level?.imageId || state.selectedImageId;
+  const randomImage = randomLevelFrom(
+    images.map((image) => ({ id: image.id })),
+    currentImageId
+  );
+  if (!randomImage) return;
+  startPreferredLevelForImage(randomImage.id);
+}
+
 function startRandomLevel() {
-  const levels = availableRandomLevels();
-  if (!levels.length) return;
-  const randomLevel = levels[Math.floor(Math.random() * levels.length)];
-  state.selectedCategoryId = randomLevel.categoryId;
-  state.selectedImageId = randomLevel.imageId || randomLevel.id;
-  startLevel(randomLevel.id, false);
+  startLevelFromRandomPool(availableRandomLevels());
+}
+
+function startCategoryRandomLevel() {
+  const categoryId = state.puzzle?.level?.categoryId || state.selectedCategoryId;
+  if (!categoryId) return;
+  const levels = categoryLevels(categoryId).filter((level) => {
+    if (level.categoryId !== "custom") return true;
+    return customImages().length > 0;
+  });
+  startLevelFromRandomPool(levels);
 }
 
 function resetCategoryProgress() {
@@ -1123,18 +1217,35 @@ function openImagePicker() {
   els.imageInput.click();
 }
 
+function openFolderPicker() {
+  if (!els.folderInput) return;
+  els.folderInput.value = "";
+  if (typeof els.folderInput.showPicker === "function") {
+    els.folderInput.showPicker();
+    return;
+  }
+  els.folderInput.click();
+}
+
 function playCurrentCustomImage() {
   const selectedImage = syncCustomImageSelection();
   if (!selectedImage) {
     openImagePicker();
     return;
   }
-  showDifficultySelect(selectedImage.id, "custom");
+  startPreferredLevelForImage(selectedImage.id, "custom");
 }
 
-function deleteCustomImage(imageId) {
+async function deleteCustomImage(imageId) {
   const targetImageId = imageId || syncCustomImageSelection()?.id;
   if (!targetImageId) return;
+  try {
+    await deleteCustomImageRecord(targetImageId);
+  } catch (error) {
+    console.warn("Failed to delete custom image from IndexedDB", error);
+    window.alert("이미지를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    return;
+  }
   state.progress.customImages = customImages().filter((item) => item.id !== targetImageId);
   imageLevels(targetImageId).forEach((level) => delete state.progress.levels[level.id]);
   if (state.progress.ongoing && levelById(state.progress.ongoing.levelId)?.imageId === targetImageId) {
@@ -1155,57 +1266,126 @@ function deleteCustomImage(imageId) {
   showScreen("home");
 }
 
-async function handleImageSelection(event) {
-  const input = event.target;
-  const [file] = input.files || [];
-  input.value = "";
-  if (!file) return;
+function isImageFile(file) {
+  return Boolean(file && typeof file.type === "string" && file.type.startsWith("image/"));
+}
+
+function customImageDisplayName(file) {
+  const relativePath = typeof file.webkitRelativePath === "string" ? file.webkitRelativePath : "";
+  if (!relativePath) return file.name;
+  const segments = relativePath.split("/").filter(Boolean);
+  return segments[segments.length - 1] || file.name;
+}
+
+function customImageSourceGroup(file, sourceLabel) {
+  if (sourceLabel !== "folder") return null;
+  const relativePath = typeof file.webkitRelativePath === "string" ? file.webkitRelativePath : "";
+  const segments = relativePath.split("/").filter(Boolean);
+  return segments[0] || "폴더 추가";
+}
+
+async function importCustomFiles(files, sourceLabel = "images") {
+  const imageFiles = files.filter(isImageFile);
+  if (!imageFiles.length) {
+    window.alert(sourceLabel === "folder"
+      ? "선택한 폴더에서 이미지 파일을 찾지 못했습니다."
+      : "선택한 파일 중에서 이미지가 없습니다.");
+    return;
+  }
+
+  const previousCustomImages = state.progress.customImages.slice();
+  const previousSelectedCustomImageId = state.progress.selectedCustomImageId;
+  const previousSelectedCategoryId = state.selectedCategoryId;
+  const previousSelectedImageId = state.selectedImageId;
+  const previousLevelScreenMode = state.levelScreenMode;
+  const previousOngoing = state.progress.ongoing;
+  const importedImages = [];
 
   try {
-    const dataUrl = await createOptimizedImageDataUrl(file);
-    const customImageId = `custom-upload-${Date.now()}`;
-    const previousCustomImages = state.progress.customImages.slice();
-    const previousSelectedCustomImageId = state.progress.selectedCustomImageId;
-    const previousSelectedCategoryId = state.selectedCategoryId;
-    const previousSelectedImageId = state.selectedImageId;
-    const previousOngoing = state.progress.ongoing;
+    for (const [index, file] of imageFiles.entries()) {
+      const createdAt = Date.now() + index;
+      const customImageId = `custom-upload-${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
+      const dataUrl = await createOptimizedImageDataUrl(file);
+      const record = {
+        id: customImageId,
+        name: customImageDisplayName(file),
+        dataUrl,
+        createdAt,
+        sourceType: sourceLabel === "folder" ? "folder" : "file",
+        sourceGroup: customImageSourceGroup(file, sourceLabel)
+      };
+      await saveCustomImageRecord(record);
+      importedImages.push(record);
+    }
 
     state.progress.customImages = [
       ...customImages(),
-      {
-        id: customImageId,
-        name: file.name,
-        dataUrl,
-        createdAt: Date.now()
-      }
+      ...importedImages
     ];
+    const lastImportedImage = importedImages[importedImages.length - 1];
     state.selectedCategoryId = "custom";
-    state.progress.selectedCustomImageId = customImageId;
-    state.selectedImageId = customImageId;
-    state.levelScreenMode = "difficulty";
+    state.progress.selectedCustomImageId = lastImportedImage.id;
+    state.selectedImageId = lastImportedImage.id;
+    state.levelScreenMode = importedImages.length === 1 ? "difficulty" : "images";
     if (state.progress.ongoing && levelById(state.progress.ongoing.levelId)?.categoryId === "custom") {
       state.progress.ongoing = null;
     }
     refreshCustomLevelData();
     if (!saveProgress()) {
-      state.progress.customImages = previousCustomImages;
-      state.progress.selectedCustomImageId = previousSelectedCustomImageId;
-      state.selectedCategoryId = previousSelectedCategoryId;
-      state.selectedImageId = previousSelectedImageId;
-      state.levelScreenMode = previousSelectedImageId ? "difficulty" : "images";
-      state.progress.ongoing = previousOngoing;
-      refreshCustomLevelData();
-      syncHome();
-      renderLevelSelect();
-      window.alert("이미지를 저장할 공간이 부족합니다. 더 작은 이미지를 선택하거나 기존 이미지를 삭제해 주세요.");
-      return;
+      throw new Error("Failed to persist import metadata");
     }
     syncHome();
-    renderLevelSelect();
-    showScreen("level");
+    if (importedImages.length === 1) {
+      startPreferredLevelForImage(lastImportedImage.id, "custom");
+    } else {
+      showImageSelect("custom");
+    }
   } catch (error) {
-    console.warn("Failed to prepare custom image", error);
-    window.alert("이미지를 불러오지 못했습니다. 다른 이미지를 다시 선택해 주세요.");
+    console.warn("Failed to import custom images", error);
+    for (const image of importedImages) {
+      try {
+        await deleteCustomImageRecord(image.id);
+      } catch (cleanupError) {
+        console.warn("Failed to roll back custom image import", cleanupError);
+      }
+    }
+    state.progress.customImages = previousCustomImages;
+    state.progress.selectedCustomImageId = previousSelectedCustomImageId;
+    state.selectedCategoryId = previousSelectedCategoryId;
+    state.selectedImageId = previousSelectedImageId;
+    state.levelScreenMode = previousLevelScreenMode;
+    state.progress.ongoing = previousOngoing;
+    refreshCustomLevelData();
+    syncHome();
+    renderLevelSelect();
+    window.alert("개인 이미지를 저장하지 못했습니다. 브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요.");
+  }
+}
+
+async function handleImageSelection(event) {
+  const input = event.target;
+  const files = Array.from(input.files || []);
+  input.value = "";
+  if (!files.length) return;
+  await importCustomFiles(files, "images");
+}
+
+async function handleFolderSelection(event) {
+  const input = event.target;
+  const files = Array.from(input.files || []);
+  input.value = "";
+  if (!files.length) return;
+  await importCustomFiles(files, "folder");
+}
+
+function supportsFolderImport() {
+  return Boolean(els.folderInput && "webkitdirectory" in els.folderInput);
+}
+
+function syncFolderImportAvailability() {
+  if (els.folderUploadBtn) {
+    els.folderUploadBtn.disabled = !supportsFolderImport();
+    els.folderUploadBtn.title = supportsFolderImport() ? "" : "이 브라우저는 폴더 선택을 지원하지 않습니다.";
   }
 }
 
@@ -1219,8 +1399,10 @@ function attachGlobalEvents() {
   window.addEventListener("beforeunload", persistOngoing);
 
   bindPress(els.uploadBtn, openImagePicker);
+  bindPress(els.folderUploadBtn, openFolderPicker);
   bindPress(els.randomBtn, startRandomLevel);
   bindIfPresent(els.imageInput, "change", handleImageSelection);
+  bindIfPresent(els.folderInput, "change", handleFolderSelection);
   bindPress(els.continueBtn, () => {
     if (!state.progress.ongoing) return;
     const ongoingLevel = levelById(state.progress.ongoing.levelId);
@@ -1234,12 +1416,6 @@ function attachGlobalEvents() {
     startLevel(state.progress.ongoing.levelId, true);
   });
   bindPress(document.getElementById("back-home-btn"), () => {
-    if (state.levelScreenMode === "difficulty" && state.selectedImageId) {
-      state.levelScreenMode = "images";
-      state.selectedImageId = null;
-      renderLevelSelect();
-      return;
-    }
     state.levelScreenMode = "images";
     syncHome();
     showScreen("home");
@@ -1253,8 +1429,9 @@ function attachGlobalEvents() {
     showScreen("level");
   });
   bindPress(document.getElementById("restart-btn"), resetCurrentLevel);
-  bindPress(document.getElementById("shuffle-btn"), resetCurrentLevel);
   bindPress(document.getElementById("hint-btn"), showHint);
+  bindPress(els.categoryRandomBtn, startCategoryRandomLevel);
+  bindPress(els.globalRandomBtn, startRandomLevel);
   bindPress(els.previewToggle, togglePreviewPanel);
   bindPress(els.hintOverlay, () => els.hintOverlay.classList.remove("show"));
   bindPress(els.nextLevelBtn, goToNextLevel);
@@ -1262,7 +1439,13 @@ function attachGlobalEvents() {
 
 async function boot() {
   await initializeLevelData();
+  try {
+    await hydrateCustomImageProgress(state.progress);
+  } catch (error) {
+    console.warn("Failed to hydrate custom images from IndexedDB", error);
+  }
   refreshCustomLevelData();
+  syncFolderImportAvailability();
   attachGlobalEvents();
   syncHome();
 }

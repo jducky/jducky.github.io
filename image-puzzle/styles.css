@@ -151,7 +151,7 @@ h1{
 }
 .hero-actions{
   display:grid;
-  grid-template-columns:repeat(3, minmax(0, 1fr));
+  grid-template-columns:repeat(2, minmax(0, 1fr));
   gap:10px;
 }
 .hero-actions .btn{
@@ -239,6 +239,28 @@ h1{
 }
 .level-grid{
   grid-template-columns:1fr;
+}
+.image-group-section{
+  display:grid;
+  gap:10px;
+}
+.image-group-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:2px 4px 0;
+}
+.image-group-title strong{
+  font-size:14px;
+  letter-spacing:-.02em;
+}
+.image-group-title span{
+  font-size:12px;
+  color:var(--muted);
+}
+.image-group-grid{
+  display:grid;
+  gap:12px;
 }
 .level-card{
   border:none;
@@ -411,8 +433,11 @@ h1{
 }
 .toolbar{
   margin-bottom:12px;
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:10px;
 }
-.toolbar .btn{flex:1;}
+.toolbar .btn{width:100%;}
 .board-panel{
   padding:14px;
 }
@@ -603,7 +628,7 @@ h1{
 .is-hidden{display:none !important;}
 @media (max-width: 420px){
   .hero-actions{
-    grid-template-columns:repeat(3, minmax(0, 1fr));
+    grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:8px;
   }
   .hero-actions .btn{
