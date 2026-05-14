@@ -41,6 +41,7 @@ const state = {
   progress: loadProgress(),
   selectedCategoryId: "custom",
   selectedImageId: null,
+  levelScreenMode: "images",
   activeLevelId: null,
   sourceCanvas: null,
   puzzle: null,
@@ -48,9 +49,18 @@ const state = {
 };
 const CORRECT_SNAP_THRESHOLD_RATIO = 0.38;
 const RELATIVE_SNAP_THRESHOLD_RATIO = 0.42;
+const COARSE_CORRECT_SNAP_THRESHOLD_RATIO = 0.5;
+const COARSE_RELATIVE_SNAP_THRESHOLD_RATIO = 0.55;
+let lastTouchPressAt = 0;
+
+function usesCoarsePointer() {
+  return typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(pointer: coarse)").matches;
+}
 
 function saveProgress() {
-  saveProgressState(state.progress);
+  return saveProgressState(state.progress);
 }
 
 function customImages() {
@@ -105,7 +115,7 @@ function derivedImagesFromLevels() {
     id: level.imageId || level.id,
     categoryId: level.categoryId,
     name: level.name,
-    image: level.image || (level.categoryId === "custom" ? state.progress.customImage : null),
+    image: level.image || null,
     seed: level.seed || (100 + index)
   }));
 }
@@ -147,6 +157,32 @@ function selectedImage() {
   return image && image.categoryId === state.selectedCategoryId ? image : null;
 }
 
+function selectLevelContext(level) {
+  if (!level) return;
+  state.selectedCategoryId = level.categoryId;
+  state.selectedImageId = level.imageId || level.id;
+  state.levelScreenMode = "difficulty";
+  if (level.categoryId === "custom") {
+    state.progress.selectedCustomImageId = state.selectedImageId;
+  }
+}
+
+function showImageSelect(categoryId = state.selectedCategoryId) {
+  state.selectedCategoryId = categoryId;
+  state.selectedImageId = null;
+  state.levelScreenMode = "images";
+  renderLevelSelect();
+  showScreen("level");
+}
+
+function showDifficultySelect(imageId, categoryId = state.selectedCategoryId) {
+  state.selectedCategoryId = categoryId;
+  state.selectedImageId = imageId;
+  state.levelScreenMode = "difficulty";
+  renderLevelSelect();
+  showScreen("level");
+}
+
 function showScreen(name) {
   Object.entries(screens).forEach(([key, node]) => {
     if (node) {
@@ -159,6 +195,27 @@ function bindIfPresent(element, eventName, handler) {
   if (element) {
     element.addEventListener(eventName, handler);
   }
+}
+
+function bindPress(element, handler) {
+  if (!element) return;
+
+  element.addEventListener("pointerup", (event) => {
+    if (event.pointerType === "mouse") return;
+    lastTouchPressAt = Date.now();
+    event.preventDefault();
+    event.stopPropagation();
+    handler(event);
+  });
+
+  element.addEventListener("click", (event) => {
+    if (Date.now() - lastTouchPressAt < 700) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    handler(event);
+  });
 }
 
 function syncHome() {
@@ -230,10 +287,7 @@ function renderCategories() {
           return;
         }
         if (emptyPack) return;
-        state.selectedCategoryId = category.id;
-        state.selectedImageId = null;
-        renderLevelSelect();
-        showScreen("level");
+        showImageSelect(category.id);
       });
       els.categoryList.appendChild(button);
     } catch (error) {
@@ -255,7 +309,7 @@ function renderLevelSelect() {
   }
 
   const image = selectedImage();
-  if (!image) {
+  if (state.levelScreenMode !== "difficulty" || !image) {
     els.levelTitle.textContent = `${category.name} 이미지`;
     els.levelSubtitle.textContent = "이미지를 선택하면 다음 화면에서 난이도를 고를 수 있습니다.";
     images.forEach((imageItem) => {
@@ -279,8 +333,7 @@ function renderLevelSelect() {
       `;
       drawImageCardThumbnail(card.querySelector("canvas"), imageItem);
       card.querySelector(".image-card-main").addEventListener("click", () => {
-        state.selectedImageId = imageItem.id;
-        renderLevelSelect();
+        showDifficultySelect(imageItem.id, category.id);
       });
       if (category.id === "custom") {
         card.querySelector(".image-delete-btn").addEventListener("click", () => {
@@ -292,6 +345,12 @@ function renderLevelSelect() {
     return;
   }
 
+  renderDifficultySelect(image, category);
+}
+
+function renderDifficultySelect(image, category = selectedCategory()) {
+  if (!image || !category || !els.levelGrid) return;
+  els.levelGrid.innerHTML = "";
   const levels = imageLevels(image.id);
   const clearedCount = levels.filter((level) => state.progress.levels[level.id]?.cleared).length;
   const bestStars = levels.reduce((best, level) => Math.max(best, state.progress.levels[level.id]?.stars || 0), 0);
@@ -331,10 +390,6 @@ function drawImageCardThumbnail(canvas, image) {
     drawImageFromSource(canvas, image.image);
     return;
   }
-  if (image.categoryId === "custom" && state.progress.customImage) {
-    drawImageFromDataUrl(canvas, state.progress.customImage);
-    return;
-  }
   const source = createLevelArtwork({ ...image, size: 4 }, 140);
   canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
 }
@@ -346,13 +401,11 @@ async function startLevel(levelId, resume = false) {
     openImagePicker();
     return;
   }
-  state.selectedImageId = level.imageId || level.id;
+  selectLevelContext(level);
   state.activeLevelId = levelId;
-  state.sourceCanvas = level.categoryId === "custom" && state.progress.customImage
-    ? await createCanvasFromDataUrl(state.progress.customImage, 480)
-    : level.image
-      ? await createCanvasFromImageUrl(level.image, 480)
-      : createLevelArtwork(level, 480);
+  state.sourceCanvas = level.image
+    ? await createCanvasFromImageUrl(level.image, 480)
+    : createLevelArtwork(level, 480);
   state.puzzle = createPuzzleState(level, resume ? state.progress.ongoing : null);
   showScreen("game");
   renderGameFrame();
@@ -572,6 +625,11 @@ function calculateStars(moves, hintsUsed, size) {
 
 function handlePointerDown(event) {
   if (state.puzzle.completed) return;
+  // Recover from a lost pointerup (Android Chrome can drop it when setPointerCapture
+  // is held on a moving element). Snap the stale tile before starting the new drag.
+  if (state.puzzle.drag) {
+    finishDrag(state.puzzle.drag.lastClientX, state.puzzle.drag.lastClientY);
+  }
   const tileId = Number(event.currentTarget.dataset.id);
   const tile = state.puzzle.tiles.find((item) => item.id === tileId);
   const members = groupMembers(tile.group);
@@ -597,7 +655,13 @@ function handlePointerDown(event) {
     item.element.style.zIndex = "20";
   });
 
-  event.currentTarget.setPointerCapture(event.pointerId);
+  // Capture on the stationary boardWrap, not the moving tile. Capturing on a
+  // moving element causes Android Chrome to drop pointerup bubbling intermittently.
+  try {
+    els.boardWrap.setPointerCapture(event.pointerId);
+  } catch (error) {
+    // setPointerCapture can throw on some mobile browsers.
+  }
 }
 
 function handlePointerMove(event) {
@@ -666,6 +730,11 @@ function finishDrag(clientX, clientY) {
     item.element.classList.remove("selected");
     item.element.style.zIndex = "1";
   });
+  try {
+    els.boardWrap.releasePointerCapture(drag.pointerId);
+  } catch (error) {
+    // ignore — capture may already be released
+  }
   state.puzzle.drag = null;
 
   if (moved) {
@@ -718,7 +787,10 @@ function getSnapTarget(drag, baseX, baseY, size) {
   const correctX = drag.tile.correctCol * size;
   const correctY = drag.tile.correctRow * size;
   const distance = Math.hypot(baseX - correctX, baseY - correctY);
-  const threshold = size * CORRECT_SNAP_THRESHOLD_RATIO;
+  const thresholdRatio = usesCoarsePointer()
+    ? COARSE_CORRECT_SNAP_THRESHOLD_RATIO
+    : CORRECT_SNAP_THRESHOLD_RATIO;
+  const threshold = size * thresholdRatio;
 
   if (distance <= threshold) {
     return { row: drag.tile.correctRow, col: drag.tile.correctCol };
@@ -730,6 +802,9 @@ function getSnapTarget(drag, baseX, baseY, size) {
 function getRelativeSnapTarget(drag, baseX, baseY, size) {
   let bestTarget = null;
   let bestDistance = Infinity;
+  const thresholdRatio = usesCoarsePointer()
+    ? COARSE_RELATIVE_SNAP_THRESHOLD_RATIO
+    : RELATIVE_SNAP_THRESHOLD_RATIO;
 
   drag.members.forEach((member) => {
     state.puzzle.tiles.forEach((candidate) => {
@@ -744,7 +819,7 @@ function getRelativeSnapTarget(drag, baseX, baseY, size) {
       const desiredY = requiredBaseRow * size;
       const distance = Math.hypot(baseX - desiredX, baseY - desiredY);
 
-      if (distance > size * RELATIVE_SNAP_THRESHOLD_RATIO) return;
+      if (distance > size * thresholdRatio) return;
       if (distance >= bestDistance) return;
 
       bestDistance = distance;
@@ -1054,10 +1129,7 @@ function playCurrentCustomImage() {
     openImagePicker();
     return;
   }
-  state.selectedCategoryId = "custom";
-  state.selectedImageId = selectedImage.id;
-  renderLevelSelect();
-  showScreen("level");
+  showDifficultySelect(selectedImage.id, "custom");
 }
 
 function deleteCustomImage(imageId) {
@@ -1076,41 +1148,65 @@ function deleteCustomImage(imageId) {
       state.selectedCategoryId = "custom";
     }
   }
+  state.levelScreenMode = "images";
   saveProgress();
   syncHome();
   renderLevelSelect();
   showScreen("home");
 }
 
-function handleImageSelection(event) {
-  const [file] = event.target.files || [];
+async function handleImageSelection(event) {
+  const input = event.target;
+  const [file] = input.files || [];
+  input.value = "";
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
+
+  try {
+    const dataUrl = await createOptimizedImageDataUrl(file);
     const customImageId = `custom-upload-${Date.now()}`;
+    const previousCustomImages = state.progress.customImages.slice();
+    const previousSelectedCustomImageId = state.progress.selectedCustomImageId;
+    const previousSelectedCategoryId = state.selectedCategoryId;
+    const previousSelectedImageId = state.selectedImageId;
+    const previousOngoing = state.progress.ongoing;
+
     state.progress.customImages = [
       ...customImages(),
       {
         id: customImageId,
         name: file.name,
-        dataUrl: reader.result,
+        dataUrl,
         createdAt: Date.now()
       }
     ];
     state.selectedCategoryId = "custom";
     state.progress.selectedCustomImageId = customImageId;
     state.selectedImageId = customImageId;
+    state.levelScreenMode = "difficulty";
     if (state.progress.ongoing && levelById(state.progress.ongoing.levelId)?.categoryId === "custom") {
       state.progress.ongoing = null;
     }
     refreshCustomLevelData();
-    saveProgress();
+    if (!saveProgress()) {
+      state.progress.customImages = previousCustomImages;
+      state.progress.selectedCustomImageId = previousSelectedCustomImageId;
+      state.selectedCategoryId = previousSelectedCategoryId;
+      state.selectedImageId = previousSelectedImageId;
+      state.levelScreenMode = previousSelectedImageId ? "difficulty" : "images";
+      state.progress.ongoing = previousOngoing;
+      refreshCustomLevelData();
+      syncHome();
+      renderLevelSelect();
+      window.alert("이미지를 저장할 공간이 부족합니다. 더 작은 이미지를 선택하거나 기존 이미지를 삭제해 주세요.");
+      return;
+    }
     syncHome();
     renderLevelSelect();
     showScreen("level");
-  };
-  reader.readAsDataURL(file);
-  event.target.value = "";
+  } catch (error) {
+    console.warn("Failed to prepare custom image", error);
+    window.alert("이미지를 불러오지 못했습니다. 다른 이미지를 다시 선택해 주세요.");
+  }
 }
 
 function attachGlobalEvents() {
@@ -1122,10 +1218,10 @@ function attachGlobalEvents() {
   });
   window.addEventListener("beforeunload", persistOngoing);
 
-  bindIfPresent(els.uploadBtn, "click", openImagePicker);
-  bindIfPresent(els.randomBtn, "click", startRandomLevel);
+  bindPress(els.uploadBtn, openImagePicker);
+  bindPress(els.randomBtn, startRandomLevel);
   bindIfPresent(els.imageInput, "change", handleImageSelection);
-  bindIfPresent(els.continueBtn, "click", () => {
+  bindPress(els.continueBtn, () => {
     if (!state.progress.ongoing) return;
     const ongoingLevel = levelById(state.progress.ongoing.levelId);
     if (!ongoingLevel) {
@@ -1134,32 +1230,34 @@ function attachGlobalEvents() {
       syncHome();
       return;
     }
-    state.selectedCategoryId = ongoingLevel.categoryId;
-    state.selectedImageId = ongoingLevel.imageId || ongoingLevel.id;
+    selectLevelContext(ongoingLevel);
     startLevel(state.progress.ongoing.levelId, true);
   });
-  bindIfPresent(document.getElementById("back-home-btn"), "click", () => {
-    if (state.selectedImageId) {
+  bindPress(document.getElementById("back-home-btn"), () => {
+    if (state.levelScreenMode === "difficulty" && state.selectedImageId) {
+      state.levelScreenMode = "images";
       state.selectedImageId = null;
       renderLevelSelect();
       return;
     }
+    state.levelScreenMode = "images";
     syncHome();
     showScreen("home");
   });
-  bindIfPresent(document.getElementById("reset-category-btn"), "click", resetCategoryProgress);
-  bindIfPresent(document.getElementById("game-back-btn"), "click", () => {
+  bindPress(document.getElementById("reset-category-btn"), resetCategoryProgress);
+  bindPress(document.getElementById("game-back-btn"), () => {
     persistOngoing();
-    state.selectedImageId = state.puzzle?.level?.imageId || state.selectedImageId;
+    const currentLevel = state.puzzle?.level || levelById(state.activeLevelId);
+    selectLevelContext(currentLevel);
     renderLevelSelect();
     showScreen("level");
   });
-  bindIfPresent(document.getElementById("restart-btn"), "click", resetCurrentLevel);
-  bindIfPresent(document.getElementById("shuffle-btn"), "click", resetCurrentLevel);
-  bindIfPresent(document.getElementById("hint-btn"), "click", showHint);
-  bindIfPresent(els.previewToggle, "click", togglePreviewPanel);
-  bindIfPresent(els.hintOverlay, "click", () => els.hintOverlay.classList.remove("show"));
-  bindIfPresent(els.nextLevelBtn, "click", goToNextLevel);
+  bindPress(document.getElementById("restart-btn"), resetCurrentLevel);
+  bindPress(document.getElementById("shuffle-btn"), resetCurrentLevel);
+  bindPress(document.getElementById("hint-btn"), showHint);
+  bindPress(els.previewToggle, togglePreviewPanel);
+  bindPress(els.hintOverlay, () => els.hintOverlay.classList.remove("show"));
+  bindPress(els.nextLevelBtn, goToNextLevel);
 }
 
 async function boot() {

@@ -10,7 +10,67 @@ function loadProgress() {
 }
 
 function saveProgressState(progress) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  const normalized = normalizeProgress(progress);
+  if (writeProgressState(normalized)) {
+    syncProgressShape(progress, normalized);
+    return true;
+  }
+
+  const selectedId = normalized.selectedCustomImageId;
+  const removableImages = normalized.customImages
+    .filter((item) => item.id !== selectedId)
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+  while (removableImages.length) {
+    const removed = removableImages.shift();
+    normalized.customImages = normalized.customImages.filter((item) => item.id !== removed.id);
+    normalized.selectedCustomImageId = normalized.customImages.some((item) => item.id === selectedId)
+      ? selectedId
+      : (normalized.customImages[normalized.customImages.length - 1]?.id || null);
+    const selectedImage = normalized.customImages.find((item) => item.id === normalized.selectedCustomImageId) || null;
+    normalized.customImage = selectedImage?.dataUrl || null;
+    normalized.customImageName = selectedImage?.name || null;
+
+    if (writeProgressState(normalized)) {
+      syncProgressShape(progress, normalized);
+      return true;
+    }
+  }
+
+  console.warn("Failed to persist progress state: storage quota exceeded");
+  return false;
+}
+
+function writeProgressState(progress) {
+  const persistable = {
+    levels: progress.levels,
+    ongoing: progress.ongoing,
+    recentLevelId: progress.recentLevelId,
+    customImages: progress.customImages.map((item) => ({
+      id: item.id,
+      name: item.name,
+      dataUrl: item.dataUrl,
+      createdAt: item.createdAt
+    })),
+    selectedCustomImageId: progress.selectedCustomImageId
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function syncProgressShape(target, source) {
+  target.levels = source.levels;
+  target.ongoing = source.ongoing;
+  target.recentLevelId = source.recentLevelId;
+  target.customImages = source.customImages.slice();
+  target.selectedCustomImageId = source.selectedCustomImageId;
+  target.customImage = source.customImage;
+  target.customImageName = source.customImageName;
 }
 
 function normalizeProgress(progress) {

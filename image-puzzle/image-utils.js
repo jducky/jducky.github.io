@@ -86,6 +86,16 @@ function createCanvasFromImageUrl(imageUrl, size) {
   return createCanvasFromSource(imageUrl, size);
 }
 
+async function createOptimizedImageDataUrl(file, size = 960, quality = 0.82) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const canvas = await createCanvasFromSource(objectUrl, size);
+    return canvas.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function createCanvasFromSource(source, size) {
   return new Promise((resolve, reject) => {
     const image = new Image();
