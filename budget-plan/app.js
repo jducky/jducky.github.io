@@ -59,6 +59,7 @@ const uiState = {
   personnelAutoAdjustMessages: {},
   personnelLibraryCollapsed: true,
   personnelLibraryDrafts: {},
+  personnelLibraryMessage: "",
   activePersonnelInstitutionId: "",
   personnelBudgetLock: {
     active: false,
@@ -325,6 +326,87 @@ function createPersonnelMaster() {
   };
 }
 
+function normalizePersonnelMaster(master) {
+  const grade = Object.keys(personnelRates).includes(master?.grade) ? master.grade : "연구원";
+  const parsedSalary = Number(master?.baseSalary);
+  const parsedMonths = Number(master?.defaultMonths);
+  return {
+    id: master?.id || crypto.randomUUID(),
+    name: typeof master?.name === "string" ? master.name.trim() : "",
+    grade,
+    baseSalary: Number.isFinite(parsedSalary) ? parsedSalary : personnelRates[grade],
+    defaultMonths: Number.isFinite(parsedMonths) ? clamp(parsedMonths, 1, 84) : 12,
+  };
+}
+
+function buildPersonnelMastersExport() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    masters: loadPersonnelMasters().map((master) => normalizePersonnelMaster(master)),
+  };
+}
+
+function downloadPersonnelMasters() {
+  const payload = buildPersonnelMastersExport();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `personnel_masters_${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  uiState.personnelLibraryMessage = `${payload.masters.length}개의 인력 기본정보를 JSON으로 저장했습니다.`;
+  renderPersonnelLibrary();
+}
+
+function importPersonnelMastersFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const raw = JSON.parse(String(reader.result || ""));
+      const importedMasters = Array.isArray(raw) ? raw : raw?.masters;
+      if (!Array.isArray(importedMasters)) {
+        throw new Error("invalid-format");
+      }
+
+      const existing = loadPersonnelMasters().map((master) => normalizePersonnelMaster(master));
+      const byName = new Map(existing.map((master) => [normalizeName(master.name), master]));
+      let importedCount = 0;
+      let updatedCount = 0;
+
+      importedMasters
+        .map((master) => normalizePersonnelMaster(master))
+        .filter((master) => normalizeName(master.name))
+        .forEach((master) => {
+          const key = normalizeName(master.name);
+          const matched = byName.get(key);
+          if (matched) {
+            matched.grade = master.grade;
+            matched.baseSalary = master.baseSalary;
+            matched.defaultMonths = master.defaultMonths;
+            updatedCount += 1;
+            return;
+          }
+          const next = { ...master, id: crypto.randomUUID() };
+          existing.push(next);
+          byName.set(key, next);
+          importedCount += 1;
+        });
+
+      savePersonnelMasters(existing);
+      uiState.personnelLibraryMessage = `${importedCount}개 추가, ${updatedCount}개 갱신했습니다.`;
+      renderPersonnelLibrary();
+    } catch (error) {
+      console.error("failed to import personnel masters", error);
+      uiState.personnelLibraryMessage = "인력 기본정보 파일을 읽지 못했습니다. JSON 형식을 확인하세요.";
+      renderPersonnelLibrary();
+    }
+  };
+  reader.readAsText(file);
+}
+
 function getUnitFactor() {
   return unitOptions.find((unit) => unit.value === state.project.unitDisplay)?.factor || 1000;
 }
@@ -337,8 +419,12 @@ function toDisplayUnit(value) {
   return ((Number(value) || 0) / getUnitFactor()).toFixed(2).replace(/\.00$/, "");
 }
 
+function roundForDisplay(value) {
+  return Number(toDisplayUnit(value));
+}
+
 function formatCurrency(value, suffix = state.project.unitDisplay) {
-  const displayed = Number(toDisplayUnit(value)).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+  const displayed = roundForDisplay(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
   return `${displayed} ${suffix}`;
 }
 
@@ -347,11 +433,11 @@ function clamp(value, min, max) {
 }
 
 function getDiffStatus(diffValue) {
-  const tolerance = 1;
-  if (Math.abs(diffValue) <= tolerance) {
+  const roundedDiff = roundForDisplay(diffValue);
+  if (Math.abs(roundedDiff) < 0.01) {
     return { label: "일치", className: "ok" };
   }
-  if (diffValue > 0) {
+  if (roundedDiff > 0) {
     return { label: "미달", className: "warn" };
   }
   return { label: "초과", className: "danger" };
@@ -1505,9 +1591,12 @@ function renderPersonnelLibrary() {
       </div>
       <div class="storage-actions">
         <button id="togglePersonnelLibraryBtn" class="secondary">${collapsed ? "펼치기" : "접기"}</button>
+        <button id="exportPersonnelMastersBtn" class="secondary">기본정보 저장</button>
+        <button id="importPersonnelMastersBtn" class="secondary">기본정보 불러오기</button>
         ${collapsed ? "" : '<button id="addPersonnelMasterBtn" class="secondary">기본정보 추가</button>'}
       </div>
     </div>
+    <input id="importPersonnelMastersInput" type="file" accept="application/json,.json" hidden />
     ${
       collapsed
         ? `<div class="muted">현재 ${masters.length}개의 인력 기본정보가 저장되어 있습니다.</div>`
@@ -1572,11 +1661,26 @@ function renderPersonnelLibrary() {
         `
         : `<div class="muted">등록된 인력 기본정보가 없습니다.</div>`
     }
+    ${uiState.personnelLibraryMessage ? `<div class="muted">${uiState.personnelLibraryMessage}</div>` : ""}
   `;
 
   document.getElementById("togglePersonnelLibraryBtn")?.addEventListener("click", () => {
     uiState.personnelLibraryCollapsed = !uiState.personnelLibraryCollapsed;
     renderPersonnelLibrary();
+  });
+
+  document.getElementById("exportPersonnelMastersBtn")?.addEventListener("click", () => {
+    downloadPersonnelMasters();
+  });
+
+  document.getElementById("importPersonnelMastersBtn")?.addEventListener("click", () => {
+    document.getElementById("importPersonnelMastersInput")?.click();
+  });
+
+  document.getElementById("importPersonnelMastersInput")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    importPersonnelMastersFromFile(file);
+    event.target.value = "";
   });
 
   document.getElementById("addPersonnelMasterBtn")?.addEventListener("click", () => {

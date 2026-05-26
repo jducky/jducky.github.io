@@ -13,24 +13,18 @@
       href="https://fonts.googleapis.com/css2?family=SUIT:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260519-3" />
     <script>
       (function () {
-        var appVersion = "20260519-3";
-        var versionKey = "__engis_budget_app_version__";
-        var reloadKey = "__engis_budget_app_reload__" + appVersion;
-        try {
-          var previous = localStorage.getItem(versionKey);
-          if (previous !== appVersion) {
-            localStorage.setItem(versionKey, appVersion);
-            if (!sessionStorage.getItem(reloadKey)) {
-              sessionStorage.setItem(reloadKey, "1");
-              window.location.replace(window.location.pathname + window.location.search + window.location.hash);
-            }
-          }
-        } catch (error) {
-          console.warn("version reload skipped", error);
-        }
+        var cacheBust = Date.now();
+
+        var stylesheet = document.createElement("link");
+        stylesheet.rel = "stylesheet";
+        stylesheet.href = "styles.css?v=" + cacheBust;
+        document.head.appendChild(stylesheet);
+
+        var script = document.createElement("script");
+        script.src = "app.js?v=" + cacheBust;
+        document.head.appendChild(script);
       })();
     </script>
   </head>
@@ -191,7 +185,5 @@
         </article>
       </section>
     </template>
-
-    <script src="app.js?v=20260519-3"></script>
   </body>
 </html>
