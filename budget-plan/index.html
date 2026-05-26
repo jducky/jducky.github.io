@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>정부 R&D 연구비 산정 프로그램</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=SUIT:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260519-3" />
+    <script>
+      (function () {
+        var appVersion = "20260519-3";
+        var versionKey = "__engis_budget_app_version__";
+        var reloadKey = "__engis_budget_app_reload__" + appVersion;
+        try {
+          var previous = localStorage.getItem(versionKey);
+          if (previous !== appVersion) {
+            localStorage.setItem(versionKey, appVersion);
+            if (!sessionStorage.getItem(reloadKey)) {
+              sessionStorage.setItem(reloadKey, "1");
+              window.location.replace(window.location.pathname + window.location.search + window.location.hash);
+            }
+          }
+        } catch (error) {
+          console.warn("version reload skipped", error);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">EnGIS Budget Planner</p>
+          <h1>정부 R&amp;D 연구비 산정 프로그램</h1>
+          <p class="muted">로컬 브라우저에서 실행되는 연구비 산정 MVP</p>
+        </div>
+
+        <nav class="stepper" id="stepper"></nav>
+
+        <section class="summary-card">
+          <h2>실시간 요약</h2>
+          <div id="statusPanel"></div>
+        </section>
+
+        <section class="summary-card">
+          <h2>프로젝트 보관함</h2>
+          <div class="storage-actions">
+            <button id="saveProjectBtn" class="secondary">로컬 저장</button>
+            <button id="exportJsonBtn" class="secondary">JSON 내보내기</button>
+          </div>
+          <div id="savedProjectList" class="saved-list"></div>
+        </section>
+      </aside>
+
+      <main class="main-content">
+        <header class="hero">
+          <div>
+            <p class="hero-kicker">Budget Planning Workspace</p>
+            <h2 id="heroTitle">새 과제 작성</h2>
+            <p id="heroDescription">
+              사업 유형, 참여기관, 비목, 인건비, 연차 배분을 순서대로 입력합니다.
+            </p>
+          </div>
+          <div class="hero-actions">
+            <button id="resetBtn" class="ghost">초기화</button>
+            <button id="sampleBtn" class="secondary">샘플 불러오기</button>
+            <button id="largeSampleBtn" class="secondary">6기관 샘플</button>
+          </div>
+        </header>
+
+        <section class="content-panel">
+          <div id="stepContent"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="step-template-basic">
+      <section class="panel basic-panel">
+        <div class="panel-header">
+          <div>
+            <h3>재원 구성</h3>
+            <p class="muted">전체와 기관별 재원을 한 화면에서 입력합니다. 기관별 비율은 총액 기준으로 자동 계산됩니다.</p>
+          </div>
+          <button id="addInstitutionBtn" class="secondary">기관 추가</button>
+        </div>
+        <div class="basic-toolbar">
+          <label>
+            <span>사업 유형</span>
+            <select data-bind="project.type"></select>
+          </label>
+          <label>
+            <span>표시 단위</span>
+            <select data-bind="project.unitDisplay"></select>
+          </label>
+          <label>
+            <span>연구기간(연차 수)</span>
+            <input data-bind="project.durationYears" type="number" min="1" max="7" />
+          </label>
+        </div>
+        <div id="institutionFundingTable"></div>
+        <div id="institutionValidation" class="inline-status"></div>
+      </section>
+    </template>
+
+    <template id="step-template-budget">
+      <section class="section-grid">
+        <article class="panel span-2">
+          <div class="panel-header">
+            <div>
+              <h3>비목 설정</h3>
+              <p class="muted">기관별 경비를 입력하면 기관 배정액을 기준으로 남는 금액이 인건비로 자동 계산됩니다. 간접비는 현재 0으로 고정됩니다.</p>
+            </div>
+            <button id="syncTemplateBtn" class="secondary">기관별 템플릿 재생성</button>
+          </div>
+          <div id="budgetEditor"></div>
+        </article>
+        <article class="panel accent">
+          <h3>검증 상태</h3>
+          <div id="budgetValidation"></div>
+        </article>
+      </section>
+    </template>
+
+    <template id="step-template-personnel">
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>인건비 상세 계산</h3>
+            <p class="muted">비목 설정에서 고정된 인건비 목표를 기준으로, 인력별 기준단가 × 참여율 × 참여월수 조합을 맞춰가는 단계입니다.</p>
+          </div>
+          <div class="storage-actions">
+            <button id="exportPersonnelBtn" class="secondary">인건비 상세 CSV</button>
+            <button id="addPersonnelBtn" class="secondary">인력 추가</button>
+          </div>
+        </div>
+        <div id="personnelSummary" class="allocation-grid"></div>
+        <div id="personnelLibrary" class="panel accent"></div>
+        <div id="personnelTable"></div>
+      </section>
+    </template>
+
+    <template id="step-template-years">
+      <section class="section-grid">
+        <article class="panel">
+          <h3>연차별 배분 패턴</h3>
+          <div class="field-grid two-col">
+            <label>
+              <span>배분 패턴</span>
+              <select data-bind="allocation.pattern"></select>
+            </label>
+          </div>
+          <div id="allocationEditor"></div>
+        </article>
+        <article class="panel accent">
+          <h3>연차 배분 검증</h3>
+          <div id="allocationValidation"></div>
+        </article>
+      </section>
+    </template>
+
+    <template id="step-template-preview">
+      <section class="section-grid">
+        <article class="panel span-2">
+          <div class="panel-header">
+            <div>
+              <h3>최종 산출표</h3>
+              <p class="muted">전체/기관별/연차별 합계를 확인하고 Excel 호환 CSV로 내보낼 수 있습니다.</p>
+            </div>
+            <div class="storage-actions">
+              <button id="exportSummaryBtn" class="secondary">전체표 CSV</button>
+              <button id="exportInstitutionBtn" class="secondary">기관별 CSV</button>
+            </div>
+          </div>
+          <div id="previewTables"></div>
+        </article>
+        <article class="panel accent">
+          <h3>출력 안내</h3>
+          <div class="note-list">
+            <p>Excel은 UTF-8 BOM CSV로 출력합니다.</p>
+            <p>DOCX 전용 출력은 외부 라이브러리 연동 전 단계이며 현재는 JSON/CSV 중심입니다.</p>
+            <p>모든 데이터는 브라우저 로컬 저장소에만 저장됩니다.</p>
+          </div>
+        </article>
+      </section>
+    </template>
+
+    <script src="app.js?v=20260519-3"></script>
+  </body>
+</html>
