@@ -17,6 +17,11 @@ __pycache__/
 .pytest_cache/
 .cache/
 
+# Node / frontend dependencies
+node_modules/
+*/node_modules/
+.vite/
+
 # Local backup / scratch files
 *.bak
 *.tmp
