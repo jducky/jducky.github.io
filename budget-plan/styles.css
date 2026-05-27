@@ -378,6 +378,41 @@ button.primary,
   font-size: 14px;
 }
 
+.personnel-table th:nth-child(1),
+.personnel-table td:nth-child(1) {
+  width: 13%;
+}
+
+.personnel-table th:nth-child(2),
+.personnel-table td:nth-child(2) {
+  width: 13%;
+}
+
+.personnel-table th:nth-child(3),
+.personnel-table td:nth-child(3) {
+  width: 12%;
+}
+
+.personnel-table th:nth-child(4),
+.personnel-table td:nth-child(4) {
+  width: 8%;
+}
+
+.personnel-table th:nth-child(5),
+.personnel-table td:nth-child(5) {
+  width: 9%;
+}
+
+.personnel-table th:nth-child(6),
+.personnel-table td:nth-child(6) {
+  width: 14%;
+}
+
+.personnel-table th:nth-child(7),
+.personnel-table td:nth-child(7) {
+  width: 31%;
+}
+
 .personnel-table .muted {
   display: block;
   margin-top: 4px;
@@ -437,7 +472,9 @@ button.primary,
 }
 
 .compact-funding-grid {
-  gap: 4px;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: start;
 }
 
 .compact-source-field span {
@@ -701,6 +738,11 @@ button.primary,
 
   #personnelSummary {
     grid-template-columns: 1fr;
+  }
+
+  .compact-funding-grid {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 

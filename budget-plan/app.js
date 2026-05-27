@@ -156,7 +156,7 @@ function createEmptyState() {
       privateCashRatio: 10,
       durationYears: 2,
       unitDisplay: "백만원",
-      createdAt: new Date().toISOString().slice(0, 10),
+      createdAt: formatLocalDate(),
     },
     institutions: [createInstitution("㈜엔지스", "주관기관", 100)],
     budgetItems: [],
@@ -597,6 +597,55 @@ function normalizeFundingSourceAmounts(person) {
 
 function calculatePersonnelFundingAmounts(person) {
   return normalizeFundingSourceAmounts(person);
+}
+
+function calculatePersonnelFundingRates(person) {
+  const denominator = (Number(person.baseSalary) || 0) * (Number(person.months) || 0);
+  const amounts = calculatePersonnelFundingAmounts(person);
+  if (!denominator) {
+    return { government: 0, privateCash: 0, privateInKind: 0 };
+  }
+  return {
+    government: (amounts.government / denominator) * 100,
+    privateCash: (amounts.privateCash / denominator) * 100,
+    privateInKind: (amounts.privateInKind / denominator) * 100,
+  };
+}
+
+function formatPercent(value) {
+  return `${Number((Number(value) || 0).toFixed(2)).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}%`;
+}
+
+function formatLocalDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatLocalDateTime(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function renderPersonnelFundingRateBreakdown(person) {
+  const amounts = calculatePersonnelFundingAmounts(person);
+  const activeSourceCount = Object.values(amounts).filter((value) => value > 0).length;
+  if (activeSourceCount < 2) return "";
+
+  const rates = calculatePersonnelFundingRates(person);
+  const entries = [
+    ["지원금", amounts.government, rates.government],
+    ["민간 현금", amounts.privateCash, rates.privateCash],
+    ["민간 현물", amounts.privateInKind, rates.privateInKind],
+  ].filter(([, amount]) => amount > 0);
+
+  return `재원별 참여율: ${entries.map(([label, , rate]) => `${label} ${formatPercent(rate)}`).join(" · ")}`;
 }
 
 function getPersonnelFundingDifference(person) {
@@ -1303,14 +1352,30 @@ function renderPersonnelStep() {
   renderPersonnelSummary(activeInstitutionId);
   renderPersonnelLibrary();
   const visiblePersonnel = state.personnel.filter((person) => person.institutionId === activeInstitutionId);
+  const countSummary = document.getElementById("personnelCountSummary");
+  const activeInstitution = state.institutions.find((inst) => inst.id === activeInstitutionId);
+  if (countSummary) {
+    const institutionLabel = activeInstitution?.name || activeInstitution?.type || "현재 기관";
+    countSummary.textContent = `${institutionLabel} 참여인력 ${visiblePersonnel.length}명 · 전체 ${state.personnel.length}명`;
+  }
   const rows = visiblePersonnel
     .map(
-      (person) => {
+      (person, index) => {
+        const fundingRateBreakdown = renderPersonnelFundingRateBreakdown(person);
         return `
         <tr>
           <td>
-            <input type="text" value="${person.name}" data-person-name="${person.id}" />
+            <div class="storage-actions compact-actions">
+              <span class="muted">${index + 1}.</span>
+              <input type="text" value="${person.name}" data-person-name="${person.id}" />
+            </div>
             <div class="muted" data-person-name-message="${person.id}">${hasDuplicateName(state.personnel, person.name, person.id) ? "같은 이름의 인력이 이미 있습니다." : ""}</div>
+            <div class="storage-actions compact-actions">
+              <button class="secondary compact-btn icon-btn" data-move-person-up="${person.id}" title="위로 이동">↑</button>
+              <button class="secondary compact-btn icon-btn" data-move-person-down="${person.id}" title="아래로 이동">↓</button>
+              <button class="secondary compact-btn" data-save-master-person="${person.id}">저장</button>
+              <button class="ghost compact-btn" data-remove-person="${person.id}">삭제</button>
+            </div>
           </td>
           <td>
             <select data-person-grade="${person.id}">
@@ -1328,6 +1393,7 @@ function renderPersonnelStep() {
           </td>
           <td><input type="number" min="1" max="84" step="1" value="${person.months}" data-person-months="${person.id}" /></td>
           <td><input type="number" min="0" step="1" value="${person.baseSalary}" data-person-salary="${person.id}" /></td>
+          <td data-person-amount="${person.id}">${formatCurrency(calculatePersonnelAmount(person))}</td>
           <td>
             <div class="mini-grid compact-funding-grid">
               <label class="compact-source-field">
@@ -1353,15 +1419,7 @@ function renderPersonnelStep() {
               </label>
             </div>
             <div class="muted" data-person-source-message="${person.id}"></div>
-          </td>
-          <td data-person-amount="${person.id}">${formatCurrency(calculatePersonnelAmount(person))}</td>
-          <td>
-            <div class="storage-actions compact-actions row-actions">
-              <button class="secondary compact-btn icon-btn" data-move-person-up="${person.id}" title="위로 이동">↑</button>
-              <button class="secondary compact-btn icon-btn" data-move-person-down="${person.id}" title="아래로 이동">↓</button>
-              <button class="secondary compact-btn" data-save-master-person="${person.id}">저장</button>
-              <button class="ghost compact-btn" data-remove-person="${person.id}">삭제</button>
-            </div>
+            <div class="muted" data-person-source-rate-message="${person.id}">${fundingRateBreakdown}</div>
           </td>
         </tr>
       `;
@@ -1378,9 +1436,8 @@ function renderPersonnelStep() {
           <th>참여율(%)</th>
           <th>참여월수</th>
           <th>기준단가(천원)</th>
-          <th>재원 구성 금액</th>
           <th>산정 인건비</th>
-          <th></th>
+          <th>재원 구성 금액</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -1392,6 +1449,20 @@ function renderPersonnelStep() {
       buildPersonnelCsv(),
       `${safeFilename(state.project.name || "personnel_detail")}_personnel.csv`,
     );
+  });
+
+  document.getElementById("clearPersonnelFundingBtn").addEventListener("click", () => {
+    state.personnel
+      .filter((person) => person.institutionId === activeInstitutionId)
+      .forEach((person) => {
+        person.fundingSourceAmounts = {
+          government: 0,
+          privateCash: 0,
+          privateInKind: 0,
+        };
+        uiState.personnelAutoAdjustMessages[person.id] = "";
+      });
+    refreshPersonnelStepDerived();
   });
 
   document.getElementById("addPersonnelBtn").addEventListener("click", () => {
@@ -1856,6 +1927,11 @@ function refreshPersonnelStepDerived() {
     element.textContent = `재원 배분 합계가 산정 인건비와 ${formatCurrency(diff)} 차이납니다.`;
   });
 
+  document.querySelectorAll("[data-person-source-rate-message]").forEach((element) => {
+    const person = state.personnel.find((item) => item.id === element.dataset.personSourceRateMessage);
+    element.textContent = person ? renderPersonnelFundingRateBreakdown(person) : "";
+  });
+
   document.querySelectorAll("[data-person-source-government]").forEach((input) => {
     const person = state.personnel.find((item) => item.id === input.dataset.personSourceGovernment);
     if (person) input.value = toDisplayUnit(person.fundingSourceAmounts.government);
@@ -2253,7 +2329,7 @@ function safeFilename(name) {
 function saveProject() {
   const saved = loadSavedProjects();
   const timestamp = new Date();
-  const savedAt = timestamp.toISOString().slice(0, 19).replace("T", " ");
+  const savedAt = formatLocalDateTime(timestamp);
   const next = [
     {
       ...structuredClone(state),
@@ -2261,7 +2337,7 @@ function saveProject() {
       savedAt,
       project: {
         ...state.project,
-        createdAt: state.project.createdAt || timestamp.toISOString().slice(0, 10),
+        createdAt: state.project.createdAt || formatLocalDate(timestamp),
       },
     },
     ...saved,
@@ -2276,7 +2352,7 @@ function loadSavedProjects() {
     const normalized = parsed.map((entry) => ({
       ...entry,
       saveId: entry.saveId || crypto.randomUUID(),
-      savedAt: entry.savedAt || entry.project?.createdAt || new Date().toISOString().slice(0, 19).replace("T", " "),
+      savedAt: entry.savedAt || entry.project?.createdAt || formatLocalDateTime(),
     }));
     if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
