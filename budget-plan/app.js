@@ -80,8 +80,8 @@ function captureFocusState() {
     active.dataset.instName ||
     active.dataset.instType ||
     active.dataset.instGovernmentInput ||
-    active.dataset.instPrivateCashInput ||
-    active.dataset.instPrivateInkindInput ||
+    active.dataset.instPrivateRatioInput ||
+    active.dataset.instPrivateCashRatioInput ||
     active.dataset.budgetId ||
     active.dataset.budgetCategory ||
     active.dataset.personName ||
@@ -113,8 +113,8 @@ function restoreFocusState(focusState) {
     `[data-inst-name="${focusState.key}"]`,
     `[data-inst-type="${focusState.key}"]`,
     `[data-inst-government-input="${focusState.key}"]`,
-    `[data-inst-private-cash-input="${focusState.key}"]`,
-    `[data-inst-private-inkind-input="${focusState.key}"]`,
+    `[data-inst-private-ratio-input="${focusState.key}"]`,
+    `[data-inst-private-cash-ratio-input="${focusState.key}"]`,
     `[data-budget-id="${focusState.key}"]`,
     `[data-budget-category="${focusState.key}"]`,
     `[data-person-name="${focusState.key}"]`,
@@ -153,6 +153,7 @@ function createEmptyState() {
       totalAmount: 0,
       governmentAmount: 0,
       privateAmount: 0,
+      privateBurdenRatio: 20,
       privateCashRatio: 10,
       durationYears: 2,
       unitDisplay: "백만원",
@@ -179,6 +180,7 @@ function createInstitution(name = "", type = "공동연구기관", ratio = 0) {
     privateCashAmount: 0,
     privateInKindAmount: 0,
     privateAmount: 0,
+    privateBurdenRatio: 20,
     privateCashRatio: 10,
     budgetConfigured: false,
     indirectRate: institutionTypeRates[type],
@@ -459,21 +461,35 @@ function syncProjectTotals() {
   state.project.totalAmount = state.project.governmentAmount + state.project.privateAmount;
   state.project.privateCashRatio =
     state.project.privateAmount > 0 ? (totals.privateCash / state.project.privateAmount) * 100 : 0;
+  state.project.privateBurdenRatio =
+    state.project.totalAmount > 0 ? (state.project.privateAmount / state.project.totalAmount) * 100 : 0;
 }
 
 function syncInstitutions() {
   state.institutions.forEach((inst) => {
+    const governmentAmount = Math.max(0, Number(inst.governmentAmount) || 0);
     const legacyPrivateAmount = Number(inst.privateAmount) || 0;
-    const privateCashAmount =
-      Number(inst.privateCashAmount) ||
-      Math.round(legacyPrivateAmount * ((Number(inst.privateCashRatio) || 0) / 100));
-    const privateInKindAmount =
-      Number(inst.privateInKindAmount) || Math.max(0, legacyPrivateAmount - privateCashAmount);
+    const derivedPrivateBurdenRatio =
+      governmentAmount + legacyPrivateAmount > 0 ? (legacyPrivateAmount / (governmentAmount + legacyPrivateAmount)) * 100 : 0;
+    const derivedPrivateCashRatio = legacyPrivateAmount > 0 ? ((Number(inst.privateCashAmount) || 0) / legacyPrivateAmount) * 100 : 0;
+    const parsedPrivateBurdenRatio = Number(inst.privateBurdenRatio);
+    const parsedPrivateCashRatio = Number(inst.privateCashRatio);
+    const privateBurdenRatio = clamp(
+      Number.isFinite(parsedPrivateBurdenRatio) ? parsedPrivateBurdenRatio : derivedPrivateBurdenRatio,
+      0,
+      99.99,
+    );
+    const privateCashRatio = clamp(Number.isFinite(parsedPrivateCashRatio) ? parsedPrivateCashRatio : derivedPrivateCashRatio, 0, 100);
+    const privateAmount = calculatePrivateBurdenAmount(governmentAmount, privateBurdenRatio);
+    const privateCashAmount = Math.round(privateAmount * (privateCashRatio / 100));
+    const privateInKindAmount = Math.max(0, privateAmount - privateCashAmount);
 
+    inst.governmentAmount = governmentAmount;
+    inst.privateBurdenRatio = privateBurdenRatio;
     inst.privateCashAmount = privateCashAmount;
     inst.privateInKindAmount = privateInKindAmount;
-    inst.privateAmount = privateCashAmount + privateInKindAmount;
-    inst.amount = (Number(inst.governmentAmount) || 0) + inst.privateAmount;
+    inst.privateAmount = privateAmount;
+    inst.amount = governmentAmount + privateAmount;
     inst.privateCashRatio = inst.privateAmount > 0 ? (privateCashAmount / inst.privateAmount) * 100 : 0;
     inst.indirectRate = 0;
   });
@@ -546,6 +562,13 @@ function syncBudgetTemplate() {
 
 function calculatePersonnelAmount(person) {
   return Math.round((Number(person.baseSalary) || 0) * ((Number(person.participationRate) || 0) / 100) * (Number(person.months) || 0));
+}
+
+function calculatePrivateBurdenAmount(governmentAmount, privateBurdenRatio) {
+  const safeGovernmentAmount = Math.max(0, Number(governmentAmount) || 0);
+  const safeRatio = clamp(Number(privateBurdenRatio) || 0, 0, 99.99);
+  if (!safeGovernmentAmount || !safeRatio) return 0;
+  return Math.round((safeGovernmentAmount * safeRatio) / (100 - safeRatio));
 }
 
 function getPrivateCashAmount() {
@@ -726,6 +749,31 @@ function applyPersonnelFundingAutoAmount(personId, sourceKey) {
     targetRemainder > maxAssignable
       ? `${label} 자동 계산은 해당 인력 최대치 ${formatCurrency(maxAssignable)}까지만 적용했습니다.`
       : `${label} 금액을 자동 계산했습니다.`;
+  refreshPersonnelStepDerived();
+}
+
+function applyPersonnelFundingRateReverse(personId, sourceKey) {
+  const person = state.personnel.find((entry) => entry.id === personId);
+  if (!person) return;
+
+  const monthlyCapacity = (Number(person.baseSalary) || 0) * (Number(person.months) || 0);
+  if (!monthlyCapacity) {
+    uiState.personnelAutoAdjustMessages[person.id] = "기준단가와 참여월수가 0보다 커야 역산할 수 있습니다.";
+    refreshPersonnelStepDerived();
+    return;
+  }
+
+  const targetAmount = Math.max(0, Number(person.fundingSourceAmounts?.[sourceKey]) || 0);
+  const rawRate = (targetAmount / monthlyCapacity) * 100;
+  const clampedRate = Number(clamp(rawRate, 0, 100).toFixed(2));
+  person.participationRate = clampedRate;
+
+  const label = sourceKey === "government" ? "지원금" : sourceKey === "privateCash" ? "민간 현금" : "민간 현물";
+  if (rawRate < 0 || rawRate > 100) {
+    uiState.personnelAutoAdjustMessages[person.id] = `${label} 기준 필요 참여율 ${rawRate.toFixed(2)}%가 범위를 벗어나 ${clampedRate}%로 보정했습니다.`;
+  } else {
+    uiState.personnelAutoAdjustMessages[person.id] = `${label} ${formatCurrency(targetAmount)} 기준 참여율을 ${clampedRate}%로 역산했습니다.`;
+  }
   refreshPersonnelStepDerived();
 }
 
@@ -1036,6 +1084,7 @@ function renderInstitutionFundingTable() {
   if (!container) return;
   const privateCashAmount = getPrivateCashAmount();
   const privateInKindAmount = getPrivateInKindAmount();
+  const projectPrivateRatio = state.project.privateBurdenRatio || 0;
   container.innerHTML = `
     <table class="data-table funding-board">
       <thead>
@@ -1043,6 +1092,8 @@ function renderInstitutionFundingTable() {
           <th>구분</th>
           <th>기관 유형</th>
           <th>정부지원금</th>
+          <th>민간부담금 비율(%)</th>
+          <th>민간부담금 중 현금(%)</th>
           <th>민간 현금</th>
           <th>민간 현물</th>
           <th>기관 총액</th>
@@ -1054,9 +1105,11 @@ function renderInstitutionFundingTable() {
         <tr class="row-total">
           <td><strong>전체</strong></td>
           <td>-</td>
-          <td>${formatCurrency(state.project.governmentAmount)}</td>
-          <td>${formatCurrency(privateCashAmount)}</td>
-          <td>${formatCurrency(privateInKindAmount)}</td>
+          <td data-total-government>${formatCurrency(state.project.governmentAmount)}</td>
+          <td data-total-private-ratio>${projectPrivateRatio.toFixed(2)}%</td>
+          <td data-total-private-cash-ratio>${state.project.privateCashRatio.toFixed(2)}%</td>
+          <td data-total-private-cash>${formatCurrency(privateCashAmount)}</td>
+          <td data-total-private-inkind>${formatCurrency(privateInKindAmount)}</td>
           <td data-total-amount>${formatCurrency(state.project.totalAmount)}</td>
           <td>100.00%</td>
           <td></td>
@@ -1074,8 +1127,10 @@ function renderInstitutionFundingTable() {
                   </select>
                 </td>
                 <td><input value="${toDisplayUnit(inst.governmentAmount)}" data-inst-government-input="${inst.id}" type="number" min="0" step="0.1" /></td>
-                <td><input value="${toDisplayUnit(getInstitutionPrivateCashAmount(inst))}" data-inst-private-cash-input="${inst.id}" type="number" min="0" step="0.1" /></td>
-                <td><input value="${toDisplayUnit(getInstitutionPrivateInKindAmount(inst))}" data-inst-private-inkind-input="${inst.id}" type="number" min="0" step="0.1" /></td>
+                <td><input value="${inst.privateBurdenRatio.toFixed(2)}" data-inst-private-ratio-input="${inst.id}" type="number" min="0" max="99.99" step="0.01" /></td>
+                <td><input value="${inst.privateCashRatio.toFixed(2)}" data-inst-private-cash-ratio-input="${inst.id}" type="number" min="0" max="100" step="0.01" /></td>
+                <td><input value="${toDisplayUnit(getInstitutionPrivateCashAmount(inst))}" data-inst-private-cash-display="${inst.id}" type="number" readonly tabindex="-1" /></td>
+                <td><input value="${toDisplayUnit(getInstitutionPrivateInKindAmount(inst))}" data-inst-private-inkind-display="${inst.id}" type="number" readonly tabindex="-1" /></td>
                 <td data-inst-amount="${inst.id}">${formatCurrency(inst.amount)}</td>
                 <td data-inst-ratio="${inst.id}">${inst.ratio.toFixed(2)}%</td>
                 <td><button class="ghost" data-remove-inst="${inst.id}">삭제</button></td>
@@ -1107,21 +1162,31 @@ function refreshInstitutionFundingTable() {
   if (activeStepIndex !== steps.findIndex((step) => step.id === "basic")) return;
 
   const totalAmountCell = document.querySelector("[data-total-amount]");
+  const totalGovernmentCell = document.querySelector("[data-total-government]");
+  const totalPrivateRatioCell = document.querySelector("[data-total-private-ratio]");
+  const totalPrivateCashRatioCell = document.querySelector("[data-total-private-cash-ratio]");
+  const totalPrivateCashCell = document.querySelector("[data-total-private-cash]");
+  const totalPrivateInKindCell = document.querySelector("[data-total-private-inkind]");
+  if (totalGovernmentCell) totalGovernmentCell.textContent = formatCurrency(state.project.governmentAmount);
+  if (totalPrivateRatioCell) totalPrivateRatioCell.textContent = `${(state.project.privateBurdenRatio || 0).toFixed(2)}%`;
+  if (totalPrivateCashRatioCell) totalPrivateCashRatioCell.textContent = `${state.project.privateCashRatio.toFixed(2)}%`;
+  if (totalPrivateCashCell) totalPrivateCashCell.textContent = formatCurrency(getPrivateCashAmount());
+  if (totalPrivateInKindCell) totalPrivateInKindCell.textContent = formatCurrency(getPrivateInKindAmount());
   if (totalAmountCell) totalAmountCell.textContent = formatCurrency(state.project.totalAmount);
 
   state.institutions.forEach((inst) => {
     const governmentInput = document.querySelector(`[data-inst-government-input="${inst.id}"]`);
-    const privateCashInput = document.querySelector(`[data-inst-private-cash-input="${inst.id}"]`);
-    const privateInKindInput = document.querySelector(`[data-inst-private-inkind-input="${inst.id}"]`);
+    const privateRatioInput = document.querySelector(`[data-inst-private-ratio-input="${inst.id}"]`);
+    const privateCashRatioInput = document.querySelector(`[data-inst-private-cash-ratio-input="${inst.id}"]`);
+    const privateCashInput = document.querySelector(`[data-inst-private-cash-display="${inst.id}"]`);
+    const privateInKindInput = document.querySelector(`[data-inst-private-inkind-display="${inst.id}"]`);
     const amountCell = document.querySelector(`[data-inst-amount="${inst.id}"]`);
     const ratioCell = document.querySelector(`[data-inst-ratio="${inst.id}"]`);
     if (governmentInput && document.activeElement !== governmentInput) governmentInput.value = toDisplayUnit(inst.governmentAmount);
-    if (privateCashInput && document.activeElement !== privateCashInput) {
-      privateCashInput.value = toDisplayUnit(getInstitutionPrivateCashAmount(inst));
-    }
-    if (privateInKindInput && document.activeElement !== privateInKindInput) {
-      privateInKindInput.value = toDisplayUnit(getInstitutionPrivateInKindAmount(inst));
-    }
+    if (privateRatioInput && document.activeElement !== privateRatioInput) privateRatioInput.value = inst.privateBurdenRatio.toFixed(2);
+    if (privateCashRatioInput && document.activeElement !== privateCashRatioInput) privateCashRatioInput.value = inst.privateCashRatio.toFixed(2);
+    if (privateCashInput) privateCashInput.value = toDisplayUnit(getInstitutionPrivateCashAmount(inst));
+    if (privateInKindInput) privateInKindInput.value = toDisplayUnit(getInstitutionPrivateInKindAmount(inst));
     if (amountCell) amountCell.textContent = formatCurrency(inst.amount);
     if (ratioCell) ratioCell.textContent = `${inst.ratio.toFixed(2)}%`;
   });
@@ -1172,19 +1237,19 @@ function bindInstitutionTable() {
     });
   });
 
-  document.querySelectorAll("[data-inst-private-cash-input]").forEach((input) => {
+  document.querySelectorAll("[data-inst-private-ratio-input]").forEach((input) => {
     input.addEventListener("input", () => {
-      const inst = state.institutions.find((item) => item.id === input.dataset.instPrivateCashInput);
-      if (inst) inst.privateCashAmount = Math.max(0, fromDisplayUnit(input.value));
+      const inst = state.institutions.find((item) => item.id === input.dataset.instPrivateRatioInput);
+      if (inst) inst.privateBurdenRatio = clamp(Number(input.value) || 0, 0, 99.99);
       clearPersonnelBudgetLock();
       refreshInstitutionFundingTable();
     });
   });
 
-  document.querySelectorAll("[data-inst-private-inkind-input]").forEach((input) => {
+  document.querySelectorAll("[data-inst-private-cash-ratio-input]").forEach((input) => {
     input.addEventListener("input", () => {
-      const inst = state.institutions.find((item) => item.id === input.dataset.instPrivateInkindInput);
-      if (inst) inst.privateInKindAmount = Math.max(0, fromDisplayUnit(input.value));
+      const inst = state.institutions.find((item) => item.id === input.dataset.instPrivateCashRatioInput);
+      if (inst) inst.privateCashRatio = clamp(Number(input.value) || 0, 0, 100);
       clearPersonnelBudgetLock();
       refreshInstitutionFundingTable();
     });
@@ -1401,6 +1466,7 @@ function renderPersonnelStep() {
                 <div class="compact-source-input">
                   <input type="number" min="0" step="0.1" value="${toDisplayUnit(person.fundingSourceAmounts.government)}" data-person-source-government="${person.id}" />
                   <button class="secondary compact-btn" data-auto-funding-source="${person.id}" data-source-key="government">자동</button>
+                  <button class="secondary compact-btn" data-reverse-funding-rate="${person.id}" data-source-key="government">역산</button>
                 </div>
               </label>
               <label class="compact-source-field">
@@ -1408,6 +1474,7 @@ function renderPersonnelStep() {
                 <div class="compact-source-input">
                   <input type="number" min="0" step="0.1" value="${toDisplayUnit(person.fundingSourceAmounts.privateCash)}" data-person-source-private-cash="${person.id}" />
                   <button class="secondary compact-btn" data-auto-funding-source="${person.id}" data-source-key="privateCash">자동</button>
+                  <button class="secondary compact-btn" data-reverse-funding-rate="${person.id}" data-source-key="privateCash">역산</button>
                 </div>
               </label>
               <label class="compact-source-field">
@@ -1415,6 +1482,7 @@ function renderPersonnelStep() {
                 <div class="compact-source-input">
                   <input type="number" min="0" step="0.1" value="${toDisplayUnit(person.fundingSourceAmounts.privateInKind)}" data-person-source-private-inkind="${person.id}" />
                   <button class="secondary compact-btn" data-auto-funding-source="${person.id}" data-source-key="privateInKind">자동</button>
+                  <button class="secondary compact-btn" data-reverse-funding-rate="${person.id}" data-source-key="privateInKind">역산</button>
                 </div>
               </label>
             </div>
@@ -2011,6 +2079,12 @@ function bindPersonnelTable() {
   document.querySelectorAll("[data-auto-funding-source]").forEach((button) => {
     button.addEventListener("click", () => {
       applyPersonnelFundingAutoAmount(button.dataset.autoFundingSource, button.dataset.sourceKey);
+    });
+  });
+
+  document.querySelectorAll("[data-reverse-funding-rate]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyPersonnelFundingRateReverse(button.dataset.reverseFundingRate, button.dataset.sourceKey);
     });
   });
 

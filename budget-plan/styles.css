@@ -242,6 +242,11 @@ select {
   background: rgba(255, 255, 255, 0.92);
 }
 
+input[readonly] {
+  background: rgba(84, 64, 32, 0.06);
+  color: var(--text);
+}
+
 button {
   border: none;
   border-radius: 14px;
@@ -491,10 +496,13 @@ button.primary,
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .compact-source-input .compact-btn {
   flex: 0 0 auto;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .funding-amounts-cell {
