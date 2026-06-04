@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KBO Player Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-copy card">
+        <div class="eyebrow">Static GitHub Pages App</div>
+        <h1>KBO<br>Player Search</h1>
+        <p>브라우저에서 바로 CSV 데이터를 검색합니다. 일반 검색, 와일드카드 검색, 헤더 클릭 정렬, 상세 보기, 결과 CSV 다운로드를 지원합니다.</p>
+        <div class="chips">
+          <span class="chip">예시: 강*호</span>
+          <span class="chip">예시: 삼성</span>
+          <span class="chip">예시: 장충고</span>
+          <span class="chip">예시: 1997-01</span>
+        </div>
+      </div>
+      <aside class="hero-meta card">
+        <div class="meta-block">
+          <span class="meta-label">총 선수 수</span>
+          <strong id="meta-total">-</strong>
+        </div>
+        <div class="meta-block">
+          <span class="meta-label">상위 팀</span>
+          <strong id="meta-teams">-</strong>
+        </div>
+        <div class="meta-block">
+          <span class="meta-label">상위 포지션</span>
+          <strong id="meta-positions">-</strong>
+        </div>
+      </aside>
+    </header>
+
+    <section class="card controls-card">
+      <div class="controls-grid">
+        <label>검색어
+          <input id="query" placeholder="예: 강*호, 삼성, 장충고, 1997-01-11">
+        </label>
+        <label>검색 항목
+          <select id="field"></select>
+        </label>
+        <label>팀명
+          <select id="team"></select>
+        </label>
+        <label>포지션
+          <select id="position"></select>
+        </label>
+      </div>
+      <div class="controls-grid secondary">
+        <label>선수명 추가조건
+          <input id="name-query" placeholder="예: 강*호">
+        </label>
+        <label>출신교 추가조건
+          <input id="school-query" placeholder="예: 장충고">
+        </label>
+        <label>생년월일 추가조건
+          <input id="birth-query" placeholder="예: 1997-01">
+        </label>
+        <div class="actions">
+          <button id="search-btn" class="btn primary" type="button">검색</button>
+          <button id="download-btn" class="btn ghost" type="button">CSV 다운로드</button>
+        </div>
+      </div>
+      <div class="controls-grid tertiary">
+        <label>정렬
+          <select id="sort-by"></select>
+        </label>
+        <label>방향
+          <select id="sort-dir">
+            <option value="asc">오름차순</option>
+            <option value="desc">내림차순</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">와일드카드: <code>*</code>는 여러 글자, <code>?</code>는 한 글자. 일반 입력은 부분일치입니다.</p>
+    </section>
+
+    <section class="card results-card">
+      <div class="toolbar">
+        <div id="summary">데이터 로딩 중...</div>
+        <div class="toolbar-right">
+          <span id="page-info"></span>
+          <span id="range-info"></span>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>현재 결과 팀 분포</h3>
+          <ul id="stat-teams"></ul>
+        </div>
+        <div class="stat-card">
+          <h3>현재 결과 포지션 분포</h3>
+          <ul id="stat-positions"></ul>
+        </div>
+        <div class="stat-card">
+          <h3>현재 결과 출신교 분포</h3>
+          <ul id="stat-schools"></ul>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-sort-key="player_id" data-label="ID">ID</th>
+              <th class="sortable" data-sort-key="name" data-label="선수명">선수명</th>
+              <th class="sortable" data-sort-key="team" data-label="팀명">팀명</th>
+              <th class="sortable" data-sort-key="position" data-label="포지션">포지션</th>
+              <th class="sortable" data-sort-key="birth" data-label="생년월일">생년월일</th>
+              <th class="sortable" data-sort-key="number" data-label="등번호">등번호</th>
+              <th class="sortable" data-sort-key="body" data-label="체격">체격</th>
+              <th class="sortable" data-sort-key="school" data-label="출신교">출신교</th>
+              <th>링크</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="empty" hidden>조건에 맞는 선수가 없습니다.</div>
+      </div>
+      <div class="pager">
+        <button id="prev-btn" class="btn ghost" type="button">이전</button>
+        <button id="next-btn" class="btn ghost" type="button">다음</button>
+      </div>
+    </section>
+
+    <section id="detail" class="card detail" hidden>
+      <div class="eyebrow">Player Detail</div>
+      <h2 id="detail-title">선수를 선택하세요</h2>
+      <div id="detail-grid" class="detail-grid"></div>
+    </section>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
