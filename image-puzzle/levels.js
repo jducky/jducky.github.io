@@ -8,7 +8,7 @@ const CUSTOM_CATEGORY = {
 let CATEGORIES = [CUSTOM_CATEGORY];
 let IMAGES = [];
 let LEVELS = [];
-const DIFFICULTIES = [3, 4, 5, 6];
+const DIFFICULTIES = [3, 4, 5, 6, 7, 8];
 let PACK_CATEGORIES = [];
 
 function buildCustomImages(customImages = []) {
@@ -122,7 +122,7 @@ function readableLevelName(imagePath, levelIndex) {
 }
 
 function clampLevelSize(size) {
-  if (![3, 4, 5, 6].includes(size)) return 4;
+  if (![3, 4, 5, 6, 7, 8].includes(size)) return 4;
   return size;
 }
 

@@ -11,7 +11,7 @@
   --shadow:0 16px 40px rgba(68, 46, 24, 0.14);
   --radius:24px;
   --radius-sm:16px;
-  --board-max:600px;
+  --board-max:720px;
   --tile-gap-border:0.5px;
   --tile-gap-radius:7px;
 }
@@ -31,10 +31,10 @@ body{
 }
 button,select{font:inherit;color:inherit;}
 .shell{
-  max-width:480px;
+  width:min(100%, 640px);
   min-height:100dvh;
   margin:0 auto;
-  padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 20px);
+  padding:calc(env(safe-area-inset-top) + 16px) 12px calc(env(safe-area-inset-bottom) + 20px);
   position:relative;
   overflow:visible;
 }
@@ -439,7 +439,7 @@ h1{
 }
 .toolbar .btn{width:100%;}
 .board-panel{
-  padding:14px;
+  padding:10px;
 }
 .board-wrap{
   position:relative;
@@ -507,10 +507,10 @@ h1{
 .tile.linked::after{
   content:"";
   position:absolute;
-  right:6px;top:6px;
-  width:10px;height:10px;border-radius:50%;
+  right:5px;top:5px;
+  width:7px;height:7px;border-radius:50%;
   background:var(--success);
-  box-shadow:0 0 0 4px rgba(31,143,95,.16);
+  box-shadow:0 0 0 2px rgba(31,143,95,.16);
 }
 .board-wrap.is-complete .tile.linked::after{
   display:none;
@@ -627,6 +627,11 @@ h1{
 }
 .is-hidden{display:none !important;}
 @media (max-width: 420px){
+  .shell{
+    width:100%;
+    padding-left:8px;
+    padding-right:8px;
+  }
   .hero-actions{
     grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:8px;
@@ -647,5 +652,8 @@ h1{
   }
   .image-delete-btn{
     justify-self:end;
+  }
+  .board-panel{
+    padding:8px;
   }
 }
