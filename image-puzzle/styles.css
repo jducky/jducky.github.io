@@ -504,16 +504,12 @@ h1{
 .tile.correct{
   border-color:rgba(31,143,95,.7);
 }
-.tile.linked::after{
-  content:"";
-  position:absolute;
-  right:5px;top:5px;
-  width:7px;height:7px;border-radius:50%;
-  background:var(--success);
-  box-shadow:0 0 0 2px rgba(31,143,95,.16);
+.tile.linked{
+  box-shadow:none;
+  background:transparent;
 }
-.board-wrap.is-complete .tile.linked::after{
-  display:none;
+.tile.linked.selected{
+  box-shadow:0 14px 24px rgba(52,33,17,.18);
 }
 .tile canvas{
   display:block;

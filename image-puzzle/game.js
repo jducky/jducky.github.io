@@ -570,19 +570,13 @@ function renderGameFrame() {
     tileNode.className = "tile";
     tileNode.dataset.id = String(tile.id);
     const tileCanvas = document.createElement("canvas");
-    tileCanvas.width = pieceSize;
-    tileCanvas.height = pieceSize;
-    tileCanvas.getContext("2d").drawImage(
-      state.sourceCanvas,
-      tile.correctCol * pieceSize,
-      tile.correctRow * pieceSize,
-      pieceSize,
-      pieceSize,
-      0,
-      0,
-      pieceSize,
-      pieceSize
-    );
+    tile.canvas = tileCanvas;
+    renderTileCanvas(tile, {
+      top: false,
+      right: false,
+      bottom: false,
+      left: false
+    });
     tileNode.appendChild(tileCanvas);
     tileNode.addEventListener("pointerdown", handlePointerDown);
     tile.element = tileNode;
@@ -598,14 +592,77 @@ function boardTileSize() {
   return els.boardWrap.clientWidth / state.puzzle.size;
 }
 
+function renderTileCanvas(tile, edges) {
+  const pieceSize = 480 / state.puzzle.level.size;
+  const bleed = 1;
+  const insetTop = edges.top ? bleed : 0;
+  const insetRight = edges.right ? bleed : 0;
+  const insetBottom = edges.bottom ? bleed : 0;
+  const insetLeft = edges.left ? bleed : 0;
+  const sourceX = tile.correctCol * pieceSize - insetLeft;
+  const sourceY = tile.correctRow * pieceSize - insetTop;
+  const sourceWidth = pieceSize + insetLeft + insetRight;
+  const sourceHeight = pieceSize + insetTop + insetBottom;
+  const canvas = tile.canvas;
+  canvas.width = sourceWidth;
+  canvas.height = sourceHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(
+    state.sourceCanvas,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+}
+
+function linkedEdges(tile) {
+  const hasNeighbor = (deltaRow, deltaCol) => state.puzzle.tiles.some((candidate) =>
+    candidate.id !== tile.id
+    && candidate.group === tile.group
+    && candidate.row === tile.row + deltaRow
+    && candidate.col === tile.col + deltaCol
+    && candidate.correctRow === tile.correctRow + deltaRow
+    && candidate.correctCol === tile.correctCol + deltaCol
+  );
+
+  return {
+    top: hasNeighbor(-1, 0),
+    right: hasNeighbor(0, 1),
+    bottom: hasNeighbor(1, 0),
+    left: hasNeighbor(0, -1)
+  };
+}
+
 function layoutTiles(activeDrag = null) {
   const size = boardTileSize();
   state.puzzle.tiles.forEach((tile) => {
-    tile.element.style.width = `${size}px`;
-    tile.element.style.height = `${size}px`;
+    const edges = linkedEdges(tile);
+    const overlap = 1;
+    const insetTop = edges.top ? overlap : 0;
+    const insetRight = edges.right ? overlap : 0;
+    const insetBottom = edges.bottom ? overlap : 0;
+    const insetLeft = edges.left ? overlap : 0;
+
+    renderTileCanvas(tile, edges);
+    tile.element.style.width = `${size + insetLeft + insetRight}px`;
+    tile.element.style.height = `${size + insetTop + insetBottom}px`;
+    tile.element.style.borderTopWidth = edges.top ? "0" : "0.5px";
+    tile.element.style.borderRightWidth = edges.right ? "0" : "0.5px";
+    tile.element.style.borderBottomWidth = edges.bottom ? "0" : "0.5px";
+    tile.element.style.borderLeftWidth = edges.left ? "0" : "0.5px";
+    tile.element.style.borderTopLeftRadius = (edges.top || edges.left) ? "0" : "7px";
+    tile.element.style.borderTopRightRadius = (edges.top || edges.right) ? "0" : "7px";
+    tile.element.style.borderBottomRightRadius = (edges.bottom || edges.right) ? "0" : "7px";
+    tile.element.style.borderBottomLeftRadius = (edges.bottom || edges.left) ? "0" : "7px";
     if (!activeDrag || !activeDrag.members.includes(tile)) {
-      tile.element.style.left = `${tile.col * size}px`;
-      tile.element.style.top = `${tile.row * size}px`;
+      tile.element.style.left = `${tile.col * size - insetLeft}px`;
+      tile.element.style.top = `${tile.row * size - insetTop}px`;
     }
     tile.element.classList.toggle("correct", isCorrect(tile));
     tile.element.classList.toggle("linked", groupMembers(tile.group).length > 1);
@@ -1423,13 +1480,17 @@ function attachGlobalEvents() {
   bindPress(document.getElementById("reset-category-btn"), resetCategoryProgress);
   bindPress(document.getElementById("game-back-btn"), () => {
     persistOngoing();
+    syncHome();
+    showScreen("home");
+  });
+  bindPress(document.getElementById("game-level-btn"), () => {
+    persistOngoing();
     const currentLevel = state.puzzle?.level || levelById(state.activeLevelId);
     selectLevelContext(currentLevel);
     renderLevelSelect();
     showScreen("level");
   });
-  bindPress(document.getElementById("restart-btn"), resetCurrentLevel);
-  bindPress(document.getElementById("hint-btn"), showHint);
+  bindPress(document.getElementById("hint-btn"), resetCurrentLevel);
   bindPress(els.categoryRandomBtn, startCategoryRandomLevel);
   bindPress(els.globalRandomBtn, startRandomLevel);
   bindPress(els.previewToggle, togglePreviewPanel);
