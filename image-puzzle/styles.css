@@ -653,6 +653,9 @@ h1{
   .level-card{
     grid-template-columns:92px 1fr;
   }
+  .difficulty-card{
+    grid-template-columns:1fr;
+  }
   .category-list{
     grid-template-columns:repeat(2, minmax(0, 1fr));
   }
