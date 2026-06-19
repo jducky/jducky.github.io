@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>착시 색 비교 실험실</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=20260619-8">
+</head>
+<body>
+  <main class="page">
+    <section class="hero panel">
+      <div class="hero-copy">
+        <p class="eyebrow">Optical Illusion Lab</p>
+        <h1>같은 얼굴색인지<br>직접 찍어서 확인</h1>
+        <p class="hero-text">
+          이미지를 올린 뒤 위쪽 얼굴과 아래쪽 얼굴을 한 번씩 클릭하세요.
+          앱이 두 지점의 평균 색을 뽑아서 같은 배경 위에 다시 보여줍니다.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <label class="upload-btn" for="image-input">이미지 선택</label>
+        <button class="ghost-btn" id="reset-btn" type="button">포인트 초기화</button>
+        <button class="ghost-btn" id="crop-mode-btn" type="button">크롭 오버레이</button>
+        <button class="ghost-btn" id="demo-btn" type="button">가이드 보기</button>
+      </div>
+      <input id="image-input" type="file" accept="image/*" hidden>
+      <p class="helper">붙여넣기 `Ctrl+V` 또는 이미지 드롭도 지원합니다. 가이드를 본 뒤에는 이미지를 다시 올리면 됩니다.</p>
+    </section>
+
+    <section class="workspace">
+      <section class="panel stage-panel">
+        <div class="section-head">
+          <div>
+            <h2>원본 이미지</h2>
+            <p id="stage-help">첫 클릭은 A, 두 번째 클릭은 B입니다. 다시 클릭하면 순서대로 갱신됩니다.</p>
+          </div>
+          <div class="mode-switch" role="tablist" aria-label="표시 모드">
+            <button class="mode-btn active" id="mode-original" data-mode="original" type="button">원본</button>
+            <button class="mode-btn" id="mode-focus" data-mode="focus" type="button">주변 어둡게</button>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvas-wrap">
+          <canvas id="image-canvas" width="900" height="900"></canvas>
+          <div class="mode-indicator" id="mode-indicator">
+            <strong id="mode-indicator-title">포인트 모드</strong>
+            <span id="mode-indicator-text">클릭해서 A/B 색 포인트를 선택</span>
+          </div>
+          <div class="crop-selection" id="crop-selection" hidden></div>
+          <div class="overlay-strip" id="overlay-strip" hidden>
+            <canvas id="overlay-canvas" width="320" height="120"></canvas>
+          </div>
+          <div class="cursor-indicator" id="cursor-indicator" hidden>
+            <span class="cursor-crosshair"></span>
+          </div>
+          <div class="empty-state" id="empty-state">
+            <strong>이미지를 올려 주세요</strong>
+            <span>착시 이미지를 선택하면 바로 비교를 시작할 수 있습니다.</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel info-panel">
+        <div class="section-head slim">
+          <div>
+            <h2>색 비교 결과</h2>
+            <p>두 포인트의 평균색과 차이를 보여줍니다.</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <article class="stat-card">
+            <span class="stat-label">RGB 거리</span>
+            <strong id="distance-value">-</strong>
+            <small id="distance-text">두 점을 선택하면 계산됩니다.</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">판정</span>
+            <strong id="verdict-value">대기 중</strong>
+            <small id="verdict-text">같은 배경에서 다시 보면 더 잘 드러납니다.</small>
+          </article>
+        </div>
+
+        <div class="point-grid">
+          <article class="point-card">
+            <div class="point-head">
+              <span class="point-badge point-a">A</span>
+              <strong>위쪽 얼굴</strong>
+            </div>
+            <div class="swatch" id="swatch-a"></div>
+            <div class="value-list">
+              <span id="hex-a">HEX -</span>
+              <span id="rgb-a">RGB -</span>
+            </div>
+          </article>
+          <article class="point-card">
+            <div class="point-head">
+              <span class="point-badge point-b">B</span>
+              <strong>아래쪽 얼굴</strong>
+            </div>
+            <div class="swatch" id="swatch-b"></div>
+            <div class="value-list">
+              <span id="hex-b">HEX -</span>
+              <span id="rgb-b">RGB -</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="compare-block">
+          <div class="compare-head">
+            <h3>중립 배경 비교</h3>
+            <p>같은 회색 바탕 위에 올리면 착시 영향이 줄어듭니다.</p>
+          </div>
+          <canvas id="compare-canvas" width="640" height="260"></canvas>
+        </div>
+
+        <div class="compare-block">
+          <div class="compare-head">
+            <h3>설명 방식 제안</h3>
+            <p>발표나 수업에서 바로 쓸 수 있는 방법입니다.</p>
+          </div>
+          <ul class="tips">
+            <li>두 얼굴의 같은 위치를 찍고, 오른쪽 스와치를 같은 회색 배경 위에서 비교합니다.</li>
+            <li>`주변 어둡게` 모드로 배경 대비를 줄인 뒤 다시 보면 두 색이 더 비슷하게 느껴집니다.</li>
+            <li>`크롭 오버레이` 모드를 켠 뒤 원하는 영역을 드래그해 잘라 올리고, 위쪽 얼굴 위로 움직여 겹쳐 볼 수 있습니다.</li>
+            <li>RGB 거리가 매우 작으면 “색 자체는 거의 같고, 주변 밝기 대비 때문에 다르게 보인다”고 설명하면 됩니다.</li>
+          </ul>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="./app.js?v=20260619-8"></script>
+</body>
+</html>
