@@ -124,7 +124,7 @@ h1{
 }
 .recent-thumb{
   width:100%;
-  height:64px;
+  aspect-ratio:1;
   margin:0 0 6px;
   border-radius:10px;
   overflow:hidden;
@@ -151,13 +151,18 @@ h1{
 }
 .hero-actions{
   display:grid;
-  grid-template-columns:repeat(2, minmax(0, 1fr));
-  gap:10px;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:8px;
 }
 .hero-actions .btn{
   min-width:0;
-  padding-left:10px;
-  padding-right:10px;
+  min-height:44px;
+  padding-left:6px;
+  padding-right:6px;
+  font-size:15px;
+  font-weight:800;
+  letter-spacing:-.03em;
+  white-space:nowrap;
 }
 .btn{
   border:none;
@@ -206,11 +211,14 @@ h1{
   display:grid;
   gap:12px;
 }
+.category-list{
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+}
 .category-card{
-  padding:18px;
+  padding:16px 14px;
   display:grid;
-  grid-template-columns:1fr auto;
-  gap:14px;
+  grid-template-columns:1fr;
+  gap:10px;
   align-items:center;
   position:relative;
   overflow:hidden;
@@ -228,15 +236,6 @@ h1{
 }
 .category-card h3{font-size:20px;letter-spacing:-.03em;margin-bottom:4px;}
 .category-card p{color:rgba(255,255,255,.84);font-size:13px;}
-.category-badge{
-  padding:8px 12px;
-  border-radius:999px;
-  background:rgba(255,255,255,.18);
-  color:#fff;
-  font-size:12px;
-  font-weight:700;
-  border:1px solid rgba(255,255,255,.24);
-}
 .level-grid{
   grid-template-columns:1fr;
 }
@@ -304,6 +303,12 @@ h1{
 }
 .difficulty-card{
   grid-template-columns:1fr;
+  width:100%;
+  align-items:stretch;
+  justify-items:stretch;
+}
+.difficulty-card .level-meta{
+  width:100%;
 }
 .difficulty-card .level-thumb{
   max-width:220px;
@@ -355,12 +360,18 @@ h1{
   grid-template-columns:repeat(2, minmax(0, 1fr));
   gap:8px;
   margin-top:10px;
+  width:100%;
+  align-items:stretch;
+  justify-items:stretch;
 }
 .difficulty-choice-grid{
-  grid-template-columns:1fr;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
 }
 .difficulty-btn{
-  min-height:38px;
+  display:grid;
+  min-height:76px;
+  width:100%;
+  justify-self:stretch;
   border-radius:12px;
   border:1px solid rgba(218,207,191,.96);
   background:#fff;
@@ -369,18 +380,20 @@ h1{
   cursor:pointer;
 }
 .difficulty-choice{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  text-align:left;
-  padding:12px 14px;
+  display:grid;
+  place-items:center;
+  text-align:center;
+  gap:6px;
+  padding:10px 8px;
 }
 .difficulty-choice strong{
-  font-size:15px;
+  font-size:24px;
+  line-height:1;
 }
 .difficulty-choice span{
   font-size:12px;
   color:var(--muted);
+  line-height:1.2;
 }
 .difficulty-btn.best{
   border-color:rgba(199,147,36,.7);
@@ -629,7 +642,7 @@ h1{
     padding-right:8px;
   }
   .hero-actions{
-    grid-template-columns:repeat(2, minmax(0, 1fr));
+    grid-template-columns:repeat(4, minmax(0, 1fr));
     gap:8px;
   }
   .hero-actions .btn{
@@ -640,6 +653,18 @@ h1{
   .level-card{
     grid-template-columns:92px 1fr;
   }
+  .category-list{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+  .category-card{
+    padding:14px 12px;
+  }
+  .category-card h3{
+    font-size:18px;
+  }
+  .category-card p{
+    font-size:12px;
+  }
   .image-card{
     grid-template-columns:1fr;
   }
@@ -648,6 +673,20 @@ h1{
   }
   .image-delete-btn{
     justify-self:end;
+  }
+  .difficulty-choice-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+  .difficulty-btn{
+    display:grid;
+    min-height:72px;
+    width:100%;
+  }
+  .difficulty-choice strong{
+    font-size:22px;
+  }
+  .difficulty-choice span{
+    font-size:11px;
   }
   .board-panel{
     padding:8px;

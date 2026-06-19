@@ -44,6 +44,7 @@ const els = {
 const state = {
   progress: loadProgress(),
   selectedCategoryId: "custom",
+  selectedCustomGroup: null,
   selectedImageId: null,
   levelScreenMode: "images",
   activeLevelId: null,
@@ -151,6 +152,53 @@ function categoryLevels(categoryId) {
   return LEVELS.filter((level) => level.categoryId === categoryId);
 }
 
+function customGroupLabelForImageId(imageId) {
+  const customImage = customImages().find((item) => item.id === imageId);
+  if (!customImage) return null;
+  return customImage.sourceType === "folder"
+    ? (customImage.sourceGroup || "폴더 추가")
+    : "직접 추가";
+}
+
+function customGroupsSummary() {
+  const groups = new Map();
+  customImages().forEach((item) => {
+    const groupLabel = item.sourceType === "folder"
+      ? (item.sourceGroup || "폴더 추가")
+      : "직접 추가";
+    if (!groups.has(groupLabel)) {
+      groups.set(groupLabel, []);
+    }
+    groups.get(groupLabel).push(item.id);
+  });
+  return Array.from(groups.entries()).map(([label, imageIds]) => {
+    const cleared = imageIds.filter((imageId) =>
+      imageLevels(imageId).some((level) => state.progress.levels[level.id]?.cleared)
+    ).length;
+    return {
+      label,
+      imageIds,
+      cleared
+    };
+  });
+}
+
+function customGroupImagesByLabel(label) {
+  const groupIds = new Set(
+    customGroupsSummary()
+      .find((group) => group.label === label)
+      ?.imageIds || []
+  );
+  return categoryImages("custom").filter((image) => groupIds.has(image.id));
+}
+
+function visibleCategoryImages(categoryId) {
+  if (categoryId !== "custom" || !state.selectedCustomGroup) {
+    return categoryImages(categoryId);
+  }
+  return customGroupImagesByLabel(state.selectedCustomGroup);
+}
+
 function selectedCategory() {
   const categories = Array.isArray(CATEGORIES) && CATEGORIES.length ? CATEGORIES : [CUSTOM_CATEGORY];
   return categories.find((item) => item.id === state.selectedCategoryId) || categories[0];
@@ -164,6 +212,9 @@ function selectedImage() {
 function selectLevelContext(level) {
   if (!level) return;
   state.selectedCategoryId = level.categoryId;
+  state.selectedCustomGroup = level.categoryId === "custom"
+    ? customGroupLabelForImageId(level.imageId || level.id)
+    : null;
   state.selectedImageId = level.imageId || level.id;
   state.levelScreenMode = "difficulty";
   if (level.categoryId === "custom") {
@@ -173,6 +224,9 @@ function selectLevelContext(level) {
 
 function showImageSelect(categoryId = state.selectedCategoryId) {
   state.selectedCategoryId = categoryId;
+  if (categoryId !== "custom") {
+    state.selectedCustomGroup = null;
+  }
   state.selectedImageId = null;
   state.levelScreenMode = "images";
   renderLevelSelect();
@@ -181,6 +235,11 @@ function showImageSelect(categoryId = state.selectedCategoryId) {
 
 function showDifficultySelect(imageId, categoryId = state.selectedCategoryId) {
   state.selectedCategoryId = categoryId;
+  if (categoryId === "custom") {
+    state.selectedCustomGroup = customGroupLabelForImageId(imageId);
+  } else {
+    state.selectedCustomGroup = null;
+  }
   state.selectedImageId = imageId;
   state.levelScreenMode = "difficulty";
   renderLevelSelect();
@@ -206,6 +265,9 @@ function startPreferredLevelForImage(imageId, categoryId = imageRecordById(image
   const level = preferredLevelForImage(imageId);
   if (!level) return;
   state.selectedCategoryId = categoryId || level.categoryId;
+  state.selectedCustomGroup = state.selectedCategoryId === "custom"
+    ? customGroupLabelForImageId(imageId)
+    : null;
   state.selectedImageId = imageId;
   startLevel(level.id, false);
 }
@@ -286,26 +348,37 @@ function renderCategories() {
   if (!els.categoryList) return;
   els.categoryList.innerHTML = "";
   const categories = Array.isArray(CATEGORIES) && CATEGORIES.length ? CATEGORIES : [CUSTOM_CATEGORY];
-  categories.forEach((category) => {
+  const visibleCards = categories.flatMap((category) => {
+    if (category.id !== "custom") return [{ category, customGroup: null }];
+    const groups = customGroupsSummary();
+    if (groups.length) {
+      return groups.map((group) => ({ category, customGroup: group.label, summary: group }));
+    }
+    return [{ category, customGroup: null }];
+  });
+  visibleCards.forEach(({ category, customGroup, summary }) => {
     try {
-      const categoryImageList = categoryImages(category.id);
-      const cleared = categoryImageList.filter((image) =>
-        imageLevels(image.id).some((level) => state.progress.levels[level.id]?.cleared)
-      ).length;
+      const categoryImageList = customGroup && category.id === "custom"
+        ? customGroupImagesByLabel(customGroup)
+        : categoryImages(category.id);
+      const cleared = typeof summary?.cleared === "number"
+        ? summary.cleared
+        : categoryImageList.filter((image) =>
+            imageLevels(image.id).some((level) => state.progress.levels[level.id]?.cleared)
+          ).length;
       const button = document.createElement("button");
       const colors = Array.isArray(category.colors) && category.colors.length >= 4
         ? category.colors
         : ["#5b8def", "#8ed1fc", "#ffe29f", "#f76b1c"];
       button.className = "category-card hero";
       button.style.background = `linear-gradient(135deg, ${colors[0]}, ${colors[3]})`;
-      const lockedByUpload = category.requiresUpload && customImages().length === 0;
+      const lockedByUpload = category.requiresUpload && !customGroup && customImages().length === 0;
       const emptyPack = !category.requiresUpload && categoryImageList.length === 0;
       button.innerHTML = `
         <div>
-          <h3>${category.name || "카테고리"}</h3>
+          <h3>${customGroup || category.name || "카테고리"}</h3>
           <p>${lockedByUpload ? "이미지를 먼저 선택하세요" : emptyPack ? "이미지 팩이 비어 있습니다" : `${categoryImageList.length}개 이미지 · ${cleared}개 완료`}</p>
         </div>
-        <span class="category-badge">${categoryImageList.length ? "3×3~6×6" : "0개"}</span>
       `;
       if (lockedByUpload || emptyPack) button.style.opacity = ".6";
       button.addEventListener("click", () => {
@@ -314,6 +387,7 @@ function renderCategories() {
           return;
         }
         if (emptyPack) return;
+        state.selectedCustomGroup = category.id === "custom" ? customGroup : null;
         showImageSelect(category.id);
       });
       els.categoryList.appendChild(button);
@@ -326,21 +400,27 @@ function renderCategories() {
 function renderLevelSelect() {
   const category = selectedCategory();
   if (!category || !els.levelGrid) return;
-  const images = categoryImages(category.id);
+  const images = visibleCategoryImages(category.id);
   els.levelGrid.innerHTML = "";
 
   if (!images.length) {
-    els.levelTitle.textContent = `${category.name} 이미지`;
+    els.levelTitle.textContent = `${state.selectedCustomGroup || category.name} 이미지`;
     els.levelSubtitle.textContent = "이 카테고리에는 아직 이미지가 없습니다.";
     return;
   }
 
   const image = selectedImage();
   if (state.levelScreenMode !== "difficulty" || !image) {
-    els.levelTitle.textContent = `${category.name} 이미지`;
+    els.levelTitle.textContent = `${state.selectedCustomGroup || category.name} 이미지`;
     els.levelSubtitle.textContent = "이미지를 선택하면 다음 화면에서 난이도를 고를 수 있습니다.";
     if (category.id === "custom") {
-      renderCustomImageGroups(images, category);
+      if (state.selectedCustomGroup) {
+        images.forEach((imageItem) => {
+          els.levelGrid.appendChild(createImageSelectCard(imageItem, category));
+        });
+      } else {
+        renderCustomImageGroups(images, category);
+      }
     } else {
       images.forEach((imageItem) => {
         els.levelGrid.appendChild(createImageSelectCard(imageItem, category));
@@ -443,7 +523,7 @@ function renderDifficultySelect(image, category = selectedCategory()) {
     button.className = `difficulty-btn difficulty-choice${record?.cleared ? " best" : ""}`;
     button.innerHTML = `
       <strong>${level.size}×${level.size}</strong>
-      <span>${record?.cleared ? `${renderStars(record.stars || 0)} 완료` : "새 게임 시작"}</span>
+      <span>${record?.cleared ? `${renderStars(record.stars || 0)} 완료` : "새 게임"}</span>
     `;
     button.addEventListener("click", () => startLevel(level.id));
     difficultyGrid.appendChild(button);
@@ -1309,6 +1389,9 @@ async function deleteCustomImage(imageId) {
     state.progress.ongoing = null;
   }
   refreshCustomLevelData();
+  if (state.selectedCustomGroup && !visibleCategoryImages("custom").length) {
+    state.selectedCustomGroup = null;
+  }
   state.selectedImageId = state.selectedCategoryId === "custom" ? null : state.selectedImageId;
   if (state.selectedCategoryId === "custom") {
     state.selectedCategoryId = CATEGORIES.find((category) => category.id !== "custom")?.id || "custom";
@@ -1381,6 +1464,9 @@ async function importCustomFiles(files, sourceLabel = "images") {
     ];
     const lastImportedImage = importedImages[importedImages.length - 1];
     state.selectedCategoryId = "custom";
+    state.selectedCustomGroup = lastImportedImage.sourceType === "folder"
+      ? (lastImportedImage.sourceGroup || "폴더 추가")
+      : "직접 추가";
     state.progress.selectedCustomImageId = lastImportedImage.id;
     state.selectedImageId = lastImportedImage.id;
     state.levelScreenMode = importedImages.length === 1 ? "difficulty" : "images";
